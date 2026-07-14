@@ -1,0 +1,12 @@
+# intel-monitor/.gitignore
+__pycache__/
+*.pyc
+.env
+data/
+node_modules/
+dist/
+.vite/
+*.db
+.gstack/
+.agents/
+skills-lock.json
