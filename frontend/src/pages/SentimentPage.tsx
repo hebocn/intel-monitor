@@ -24,6 +24,7 @@ interface SentimentPost {
   time_decay: number; impact_score: number
   videos_json: string | null; images_json: string | null; comments_json: string | null; score_detail: string | null
   fetched_at: string
+  deep_analysis_status?: string | null
 }
 interface SentimentTask {
   id: number; keyword: string; platforms: string; status: string
@@ -32,8 +33,8 @@ interface SentimentTask {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
-const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb' }
-const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区' }
+const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000' }
+const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube' }
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:   { color: '#f59e0b', icon: <ClockCircleOutlined />,   text: '等待' },
   running:   { color: '#3b82f6', icon: <SyncOutlined spin />,      text: '搜索中' },
@@ -168,6 +169,74 @@ function PostComments({ commentsJson }: { commentsJson: string | null }) {
       </div>
     )
   } catch { return null }
+}
+
+function DeepAnalysisButton({ post }: { post: SentimentPost }) {
+  const [status, setStatus] = useState(post.deep_analysis_status || 'idle')
+  const [loading, setLoading] = useState(false)
+
+  const handleTrigger = async () => {
+    setLoading(true)
+    setStatus('processing')
+    try {
+      await sentimentAPI.triggerDeepAnalysis(post.id)
+    } catch (err: any) {
+      setLoading(false)
+      setStatus('idle')
+      return
+    }
+    setLoading(false)
+  }
+
+  // Poll status when processing
+  useEffect(() => {
+    if (status !== 'processing') return
+    const timer = setInterval(async () => {
+      try {
+        const res = await sentimentAPI.getDeepAnalysisStatus(post.id)
+        if (res.data.status === 'completed') {
+          setStatus('completed')
+          clearInterval(timer)
+          // Refresh the page to show new content
+          window.location.reload()
+        } else if (res.data.status === 'failed') {
+          setStatus('failed')
+          clearInterval(timer)
+          window.location.reload()
+        }
+      } catch { /* keep polling */ }
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [status, post.id])
+
+  const statusStyle = {
+    idle: { bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', text: '🎧 深度分析', hint: '下载音频+转录+AI摘要' },
+    processing: { bg: '#eff6ff', border: '#93c5fd', color: '#2563eb', text: '⏳ 分析中...', hint: '下载音频 → 转录 → AI摘要' },
+    completed: { bg: '#f0fdf4', border: '#86efac', color: '#16a34a', text: '✅ 深度分析已完成', hint: '页面刷新后可见' },
+    failed: { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', text: '❌ 深度分析失败', hint: '点击重试' },
+  }[status] || statusStyle.idle
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <button
+        onClick={status === 'idle' || status === 'failed' ? handleTrigger : undefined}
+        disabled={loading || status === 'processing' || status === 'completed'}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '8px 18px', borderRadius: 20,
+          background: statusStyle.bg, border: `1px solid ${statusStyle.border}`,
+          color: statusStyle.color, fontSize: 13, fontWeight: 600,
+          cursor: (status === 'idle' || status === 'failed') && !loading ? 'pointer' : 'default',
+          opacity: loading || status === 'processing' ? 0.8 : 1,
+          transition: 'all 0.15s',
+        }}
+      >
+        {loading && <SyncOutlined spin />}
+        <span>{statusStyle.text}</span>
+        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>{statusStyle.hint}</span>
+      </button>
+    </div>
+  )
 }
 
 function MetricRow({ post }: { post: SentimentPost }) {
@@ -446,6 +515,9 @@ export default function SentimentPage() {
                       </Space>
                     </div>
                     <PostContent title={post.title} content={post.content || ''} />
+                    {post.platform === 'youtube' && (
+                      <DeepAnalysisButton post={post} />
+                    )}
                     <PostImages imagesJson={post.images_json} />
                     <PostVideos videosJson={post.videos_json} />
                     <PostComments commentsJson={post.comments_json} />

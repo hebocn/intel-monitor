@@ -16,14 +16,43 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from database import init_db
+from database import init_db, engine
 from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence
 from services.scheduler import setup_scheduler, refresh_jobs
+
+
+async def _ensure_schema():
+    """Auto-add missing columns to existing tables (no Alembic)."""
+    import re
+    from sqlalchemy import text
+
+    migrations = [
+        # migration_id, check_sql, apply_sql
+        (
+            "sentiment_posts_deep_analysis_status",
+            "SELECT deep_analysis_status FROM sentiment_posts LIMIT 0",
+            "ALTER TABLE sentiment_posts ADD COLUMN deep_analysis_status VARCHAR(20) DEFAULT NULL",
+        ),
+    ]
+
+    async with engine.begin() as conn:
+        for migration_id, check_sql, apply_sql in migrations:
+            try:
+                await conn.execute(text(check_sql))
+            except Exception:
+                logger = logging.getLogger("migration")
+                logger.info(f"Applying migration: {migration_id}")
+                try:
+                    await conn.execute(text(apply_sql))
+                    logger.info(f"Migration {migration_id} applied successfully")
+                except Exception as e:
+                    logger.warning(f"Migration {migration_id} failed: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await _ensure_schema()
     setup_scheduler()
     await refresh_jobs()
     yield

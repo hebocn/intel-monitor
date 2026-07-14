@@ -108,6 +108,8 @@ export const sentimentAPI = {
     api.get('/sentiment/tasks', { params }),
   getTask: (id: number) => api.get(`/sentiment/tasks/${id}`),
   deleteTask: (id: number) => api.delete(`/sentiment/tasks/${id}`),
+  triggerDeepAnalysis: (postId: number) => api.post(`/sentiment/posts/${postId}/deep-analyze`),
+  getDeepAnalysisStatus: (postId: number) => api.get(`/sentiment/posts/${postId}/deep-analyze`),
 }
 
 // Intelligence Reports

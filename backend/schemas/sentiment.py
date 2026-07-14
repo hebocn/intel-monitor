@@ -57,6 +57,7 @@ class SentimentPostResponse(BaseModel):
     comments_json: str | None
     score_detail: str | None
     fetched_at: datetime
+    deep_analysis_status: str | None = None
 
     model_config = {"from_attributes": True}
 

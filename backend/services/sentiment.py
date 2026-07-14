@@ -12,7 +12,9 @@ from crawlers.base import _run_crawler_in_thread
 from crawlers.weibo_crawler import WeiboCrawler, search_weibo_via_autocli
 from crawlers.douyin_crawler import DouyinCrawler
 from crawlers.toutiao_crawler import ToutiaoCrawler
+from crawlers.toutiao_scrapling_crawler import ToutiaoScraplingCrawler
 from crawlers.tiantai108_crawler import Tiantai108Crawler
+from crawlers.youtube_search import search_youtube
 from services.scoring import (
     calculate_impact, get_platform_stats_dict, get_platform_all_values,
     PLATFORM_MAU_DEFAULTS, DEFAULT_HALF_LIFE_DAYS,
@@ -54,11 +56,15 @@ async def run_sentiment_search(task_id: int, keyword: str, platforms: list[str],
                 elif platform == "xiaohongshu":
                     result = await _search_xiaohongshu(keyword, post_limit)
                 elif platform == "toutiao":
-                    crawler = ToutiaoCrawler()
-                    result = await crawler.search_by_keyword(keyword, limit=post_limit)
+                    # Try CDP first (reuses Chrome login), fall back to Scrapling
+                    result = await _search_toutiao(keyword, post_limit)
                 elif platform == "108community":
                     crawler = Tiantai108Crawler()
                     result = await _run_crawler_in_thread(crawler.search_by_keyword(keyword, limit=post_limit))
+                elif platform == "youtube":
+                    result = await search_youtube(keyword, limit=post_limit)
+                    if result.success and result.posts:
+                        await _generate_youtube_summaries(result.posts)
                 else:
                     return platform, [], f"Unsupported platform: {platform}"
 
@@ -155,3 +161,52 @@ async def _search_xiaohongshu(keyword: str, limit: int):
     """Search Xiaohongshu via CDP browser driver (Chrome login required)."""
     from crawlers.xhs_cdp_search import search_xhs
     return await search_xhs(keyword, limit)
+
+
+async def _search_toutiao(keyword: str, limit: int):
+    """Search Toutiao: try CDP first (reuses Chrome login), fall back to Scrapling."""
+    try:
+        crawler = ToutiaoCrawler()
+        result = await crawler.search_by_keyword(keyword, limit=limit)
+        if result.success:
+            return result
+        logger.warning(f"Toutiao CDP failed: {result.error_message}, trying Scrapling fallback...")
+    except Exception as e:
+        logger.warning(f"Toutiao CDP error: {e}, trying Scrapling fallback...")
+
+    try:
+        scrapling = ToutiaoScraplingCrawler()
+        return await scrapling.search_by_keyword(keyword, limit=limit)
+    except Exception as e:
+        logger.exception("Toutiao Scrapling search error")
+        from crawlers.base import CrawlResult
+        return CrawlResult(success=False, error_message=str(e))
+
+
+async def _generate_youtube_summaries(posts: list):
+    """Generate Chinese first-level summaries for YouTube videos via LLM.
+
+    Called concurrently for each video post-data. Summaries are appended to
+    ``PostData.content`` with a separator.
+    """
+    from services.summarizer import summarizer
+
+    async def _summarize_one(p):
+        if not p.title and not p.content:
+            return
+        try:
+            system_prompt = (
+                "你是一个视频内容摘要助手。请基于视频的标题和描述，生成一段简洁的中文摘要"
+                "（100字以内），概括视频的核心内容。"
+                "直接输出摘要文本，不要输出思考过程。"
+            )
+            user_prompt = f"标题：{p.title}\n描述：{(p.content or '')[:800]}"
+            summary = await summarizer._call_ai(system_prompt, user_prompt)
+            if summary:
+                p.content = (p.content or "") + "\n\n【AI 摘要】\n" + summary.strip()
+                logger.info(f"Youtube summary generated for: {p.title[:50]}")
+        except Exception as e:
+            logger.warning(f"Youtube summary failed for '{p.title[:50]}': {e}")
+
+    tasks = [_summarize_one(p) for p in posts]
+    await asyncio.gather(*tasks)

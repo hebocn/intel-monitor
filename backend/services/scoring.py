@@ -26,6 +26,7 @@ PLATFORM_MAU_DEFAULTS = {
     "xiaohongshu": 300_000_000,
     "toutiao": 350_000_000,
     "108community": 500_000,
+    "youtube": 2_500_000_000,
 }
 
 DEFAULT_HALF_LIFE_DAYS = 4.0
@@ -85,6 +86,10 @@ def calculate_impact(
             p = _interpolate_percentile(v, stats)
         elif all_platform_values and key in all_platform_values:
             p = _log10_score(v, all_platform_values[key])
+        elif v > 0:
+            # Cold start: use self-referencing log10 score
+            # Fallback so new platforms don't get zero scores
+            p = log10(v + 1) / log10(v + 2)  # asymptotic to ~1.0 for large v
         else:
             p = 0.0
 

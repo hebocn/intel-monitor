@@ -32,6 +32,7 @@ PLATFORM_INFO = {
     "xiaohongshu": {"label": "小红书", "metrics": ["likes", "comments", "bookmarks"]},
     "toutiao": {"label": "今日头条", "metrics": ["comments"]},
     "108community": {"label": "108天台社区", "metrics": ["comments"]},
+    "youtube": {"label": "YouTube", "metrics": ["views", "likes", "comments"]},
 }
 
 
@@ -156,3 +157,53 @@ async def delete_task(
     await db.delete(task)
     await db.commit()
     return {"message": "任务已删除"}
+
+
+# ── Deep Analysis (YouTube) ─────────────────────────────────────────
+
+
+@router.post("/posts/{post_id}/deep-analyze")
+async def trigger_deep_analysis(
+    post_id: int,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Trigger deep analysis for a YouTube video (audio download → Whisper → LLM summary).
+
+    Sets deep_analysis_status to 'processing' and spawns a background task.
+    Returns immediately with the current status.
+    """
+    stmt = select(SentimentPost).where(SentimentPost.id == post_id)
+    result = await db.execute(stmt)
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="帖子不存在")
+    if post.platform != "youtube":
+        raise HTTPException(status_code=400, detail="仅 YouTube 视频支持深度分析")
+    if post.deep_analysis_status == "processing":
+        return {"status": "processing", "message": "深度分析正在执行中"}
+
+    # Mark processing
+    post.deep_analysis_status = "processing"
+    await db.commit()
+
+    # Spawn background task
+    from services.youtube_deep import run_deep_analysis
+    asyncio.create_task(run_deep_analysis(post.id, post.url))
+
+    return {"status": "processing", "message": "深度分析已启动"}
+
+
+@router.get("/posts/{post_id}/deep-analyze")
+async def get_deep_analysis_status(
+    post_id: int,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """Get deep analysis status for a post."""
+    stmt = select(SentimentPost).where(SentimentPost.id == post_id)
+    result = await db.execute(stmt)
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="帖子不存在")
+    return {"status": post.deep_analysis_status or "idle"}

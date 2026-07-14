@@ -60,6 +60,15 @@ PROVIDERS = {
         "parser": "tavily",  # special parser for service API key test
         "label": "Tavily",
     },
+    "youtube": {
+        "key_env": "YOUTUBE_API_KEY",
+        "url_env": None,
+        "model_env": None,
+        "default_url": "https://www.googleapis.com/youtube/v3",
+        "default_model": "",
+        "parser": "youtube",  # custom test: hit videos.list with chart=mostPopular
+        "label": "YouTube Data API v3",
+    },
 }
 
 
@@ -170,6 +179,39 @@ async def _test_key(provider: str, api_key: str) -> dict:
             if "401" in msg or "unauthorized" in msg.lower():
                 return {"success": False, "message": "API Key 无效（认证失败）"}
             return {"success": False, "message": f"连接失败: {msg}"}
+
+    # Special handling for YouTube Data API v3
+    if provider == "youtube":
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={
+                        "part": "snippet",
+                        "chart": "mostPopular",
+                        "maxResults": 1,
+                        "regionCode": "CN",
+                        "key": api_key,
+                    },
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data.get("items", [])
+                if items:
+                    title = items[0].get("snippet", {}).get("title", "")
+                    return {"success": True, "message": f"Youtube API Key 验证成功", "reply": title[:100]}
+                return {"success": True, "message": "Youtube API Key 验证成功（热门视频返回为空）"}
+            if resp.status_code == 403:
+                body = resp.json() if resp.text else {}
+                reason = body.get("error", {}).get("errors", [{}])[0].get("reason", "")
+                if reason == "quotaExceeded":
+                    return {"success": False, "message": "YouTube API 日配额已用尽"}
+                return {"success": False, "message": "API Key 无效或被限制"}
+            return {"success": False, "message": f"YouTube API HTTP {resp.status_code}"}
+        except httpx.TimeoutException:
+            return {"success": False, "message": "连接超时，请检查网络"}
+        except Exception as e:
+            return {"success": False, "message": f"连接失败: {str(e)}"}
 
     base_url = cfg["base_url"]
     model = cfg["model"]

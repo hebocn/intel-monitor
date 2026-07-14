@@ -19,6 +19,7 @@ const aiProviders = [
 const serviceProviders = [
   { key: 'firecrawl', label: 'Firecrawl', color: '#d97706', desc: 'Web 搜索 + 全文抓取 · 开源情报核心引擎' },
   { key: 'tavily', label: 'Tavily', color: '#0891b2', desc: 'AI 驱动 Web 搜索 · 深度内容提取' },
+  { key: 'youtube', label: 'YouTube', color: '#FF0000', desc: 'YouTube Data API v3 · 关键词搜索 + 视频元数据' },
 ]
 
 // All providers for backward compat in status loading
@@ -322,6 +323,7 @@ export default function SettingsPage() {
     mimo: { ...defaultState },
     firecrawl: { ...defaultState },
     tavily: { ...defaultState },
+    youtube: { ...defaultState },
   })
 
   const updateProvider = useCallback((key: string, patch: Partial<ProviderState>) => {

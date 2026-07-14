@@ -35,5 +35,6 @@ class SentimentPost(Base):
     comments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     score_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    deep_analysis_status: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
 
     task: Mapped["SentimentTask"] = relationship("SentimentTask", back_populates="posts")
