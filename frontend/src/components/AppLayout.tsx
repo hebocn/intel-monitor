@@ -3,7 +3,7 @@ import {
   DashboardOutlined, MobileOutlined, GlobalOutlined,
   SettingOutlined, LogoutOutlined, RadarChartOutlined,
   LeftOutlined, RightOutlined, FireOutlined, SearchOutlined,
-  FileTextOutlined,
+  FileTextOutlined, SwapOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ReactNode, useState, useEffect, useCallback } from 'react'
@@ -38,6 +38,7 @@ const menuItems = [
   { key: '/hot-topics', icon: <FireOutlined />, label: '热门话题' },
   { key: '/sentiment', icon: <SearchOutlined />, label: '舆情搜索' },
   { key: '/intelligence', icon: <FileTextOutlined />, label: '情报报告' },
+  { key: '/account-match', icon: <SwapOutlined />, label: '账号比对' },
   { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
 ]
 

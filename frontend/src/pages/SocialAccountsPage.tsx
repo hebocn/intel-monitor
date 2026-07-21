@@ -406,7 +406,7 @@ export default function SocialAccountsPage() {
               onRun={() => handleRunNow(target.id)}
               onEdit={() => openEditModal(target)}
               onDelete={() => handleDelete(target.id)}
-              onDetail={() => navigate(`/detail/social/${target.id}`)}
+              onDetail={() => navigate(`/detail/social_media/${target.id}`)}
               idx={idx}
             />
           ))}

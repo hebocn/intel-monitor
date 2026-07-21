@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db, engine
-from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence
+from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match
 from services.scheduler import setup_scheduler, refresh_jobs
 
 
@@ -32,6 +32,94 @@ async def _ensure_schema():
             "sentiment_posts_deep_analysis_status",
             "SELECT deep_analysis_status FROM sentiment_posts LIMIT 0",
             "ALTER TABLE sentiment_posts ADD COLUMN deep_analysis_status VARCHAR(20) DEFAULT NULL",
+        ),
+        (
+            "sentiment_posts_quoted_tweet_json",
+            "SELECT quoted_tweet_json FROM sentiment_posts LIMIT 0",
+            "ALTER TABLE sentiment_posts ADD COLUMN quoted_tweet_json TEXT DEFAULT NULL",
+        ),
+        (
+            "sentiment_posts_card_json",
+            "SELECT card_json FROM sentiment_posts LIMIT 0",
+            "ALTER TABLE sentiment_posts ADD COLUMN card_json TEXT DEFAULT NULL",
+        ),
+        (
+            "sentiment_posts_sort_order",
+            "SELECT sort_order FROM sentiment_posts LIMIT 0",
+            "ALTER TABLE sentiment_posts ADD COLUMN sort_order INTEGER DEFAULT 0",
+        ),
+        (
+            "account_match_tasks",
+            "SELECT 1 FROM account_match_tasks LIMIT 0",
+            """CREATE TABLE IF NOT EXISTS account_match_tasks (
+                id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                target_name VARCHAR(100) NOT NULL, platforms VARCHAR(200) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                total_candidates INTEGER DEFAULT 0, total_groups INTEGER DEFAULT 0,
+                error_log TEXT, match_mode VARCHAR(20) DEFAULT 'nickname',
+                anchor_profile_json TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                completed_at DATETIME, PRIMARY KEY (id),
+                FOREIGN KEY(user_id) REFERENCES users (id)
+            )""",
+        ),
+        (
+            "account_match_tasks_match_mode",
+            "SELECT match_mode FROM account_match_tasks LIMIT 0",
+            "ALTER TABLE account_match_tasks ADD COLUMN match_mode VARCHAR(20) DEFAULT 'nickname'",
+        ),
+        (
+            "account_match_tasks_anchor_profile",
+            "SELECT anchor_profile_json FROM account_match_tasks LIMIT 0",
+            "ALTER TABLE account_match_tasks ADD COLUMN anchor_profile_json TEXT DEFAULT NULL",
+        ),
+        (
+            "account_match_candidates",
+            "SELECT 1 FROM account_match_candidates LIMIT 0",
+            """CREATE TABLE IF NOT EXISTS account_match_candidates (
+                id INTEGER NOT NULL, task_id INTEGER NOT NULL,
+                platform VARCHAR(20) NOT NULL, platform_uid VARCHAR(200) NOT NULL,
+                nickname VARCHAR(100) NOT NULL, avatar_url VARCHAR(500),
+                bio TEXT, followers_count INTEGER DEFAULT 0,
+                profile_url VARCHAR(500), profile_json TEXT, posts_json TEXT,
+                match_score FLOAT DEFAULT 0.0,
+                score_detail_json TEXT,
+                matched_with VARCHAR(200),
+                PRIMARY KEY (id),
+                FOREIGN KEY(task_id) REFERENCES account_match_tasks (id)
+            )""",
+        ),
+        (
+            "account_match_candidates_match_score",
+            "SELECT match_score FROM account_match_candidates LIMIT 0",
+            "ALTER TABLE account_match_candidates ADD COLUMN match_score FLOAT DEFAULT 0.0",
+        ),
+        (
+            "account_match_candidates_score_detail",
+            "SELECT score_detail_json FROM account_match_candidates LIMIT 0",
+            "ALTER TABLE account_match_candidates ADD COLUMN score_detail_json TEXT DEFAULT NULL",
+        ),
+        (
+            "account_match_candidates_matched_with",
+            "SELECT matched_with FROM account_match_candidates LIMIT 0",
+            "ALTER TABLE account_match_candidates ADD COLUMN matched_with VARCHAR(200) DEFAULT NULL",
+        ),
+        (
+            "account_match_results",
+            "SELECT 1 FROM account_match_results LIMIT 0",
+            """CREATE TABLE IF NOT EXISTS account_match_results (
+                id INTEGER NOT NULL, task_id INTEGER NOT NULL,
+                group_label VARCHAR(100) NOT NULL, confidence_score FLOAT DEFAULT 0.0,
+                account_ids_json TEXT NOT NULL, ai_analysis TEXT,
+                score_detail TEXT,
+                PRIMARY KEY (id),
+                FOREIGN KEY(task_id) REFERENCES account_match_tasks (id)
+            )""",
+        ),
+        (
+            "account_match_results_score_detail",
+            "SELECT score_detail FROM account_match_results LIMIT 0",
+            "ALTER TABLE account_match_results ADD COLUMN score_detail TEXT DEFAULT NULL",
         ),
     ]
 
@@ -72,6 +160,7 @@ app.include_router(tools.router)
 app.include_router(hot_topics.router)
 app.include_router(sentiment.router)
 app.include_router(intelligence.router)
+app.include_router(account_match.router)
 
 # Serve frontend static files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"

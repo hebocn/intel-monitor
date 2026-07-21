@@ -33,6 +33,7 @@ PLATFORM_INFO = {
     "toutiao": {"label": "今日头条", "metrics": ["comments"]},
     "108community": {"label": "108天台社区", "metrics": ["comments"]},
     "youtube": {"label": "YouTube", "metrics": ["views", "likes", "comments"]},
+    "x": {"label": "X (Twitter)", "metrics": ["views", "likes", "comments", "shares", "bookmarks"]},
 }
 
 

@@ -55,6 +55,8 @@ class SentimentPostResponse(BaseModel):
     images_json: str | None
     videos_json: str | None
     comments_json: str | None
+    quoted_tweet_json: str | None = None
+    card_json: str | None = None
     score_detail: str | None
     fetched_at: datetime
     deep_analysis_status: str | None = None

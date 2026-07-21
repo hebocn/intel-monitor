@@ -23,6 +23,7 @@ interface SentimentPost {
   metrics_partial: boolean; engagement_score: number; platform_weight: number
   time_decay: number; impact_score: number
   videos_json: string | null; images_json: string | null; comments_json: string | null; score_detail: string | null
+  quoted_tweet_json: string | null; card_json: string | null
   fetched_at: string
   deep_analysis_status?: string | null
 }
@@ -33,8 +34,8 @@ interface SentimentTask {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
-const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000' }
-const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube' }
+const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000', x: '#000000' }
+const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube', x: 'X' }
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:   { color: '#f59e0b', icon: <ClockCircleOutlined />,   text: '等待' },
   running:   { color: '#3b82f6', icon: <SyncOutlined spin />,      text: '搜索中' },
@@ -171,6 +172,60 @@ function PostComments({ commentsJson }: { commentsJson: string | null }) {
   } catch { return null }
 }
 
+function QuotedTweet({ quotedTweetJson }: { quotedTweetJson: string | null }) {
+  if (!quotedTweetJson) return null
+  try {
+    const qt: { author: string; name: string; text: string; url: string } = JSON.parse(quotedTweetJson)
+    if (!qt || !qt.text) return null
+    return (
+      <div style={{
+        marginBottom: 10, padding: '10px 14px', borderRadius: 10,
+        borderLeft: `3px solid #1DA1F2`, background: '#f8fafc',
+        fontSize: 13, lineHeight: 1.7, color: '#475569',
+      }}>
+        <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontWeight: 600, color: '#1e293b' }}>{qt.name || `@${qt.author}`}</span>
+          <span style={{ color: '#94a3b8', fontSize: 11 }}>@{qt.author}</span>
+        </div>
+        <div style={{ wordBreak: 'break-word' }}>
+          {qt.text.length > 200 ? qt.text.slice(0, 200) + '…' : qt.text}
+        </div>
+        {qt.url && (
+          <a href={qt.url} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 11, color: '#3b82f6', display: 'inline-block', marginTop: 4 }}>
+            查看引用推文 ↗
+          </a>
+        )}
+      </div>
+    )
+  } catch { return null }
+}
+
+function LinkCard({ cardJson }: { cardJson: string | null }) {
+  if (!cardJson) return null
+  try {
+    const card: { title?: string; description?: string; url?: string; domain?: string; image_url?: string } = JSON.parse(cardJson)
+    if (!card.url && !card.title) return null
+    return (
+      <a href={card.url || '#'} target="_blank" rel="noopener noreferrer"
+        style={{
+          display: 'flex', gap: 10, marginBottom: 10, padding: '10px 12px',
+          borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+          textDecoration: 'none', color: 'inherit', maxWidth: 400,
+        }}>
+        {card.image_url && (
+          <img src={card.image_url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+        )}
+        <div style={{ minWidth: 0 }}>
+          {card.domain && <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{card.domain}</div>}
+          {card.title && <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.title}</div>}
+          {card.description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.description}</div>}
+        </div>
+      </a>
+    )
+  } catch { return null }
+}
+
 function DeepAnalysisButton({ post }: { post: SentimentPost }) {
   const [status, setStatus] = useState(post.deep_analysis_status || 'idle')
   const [loading, setLoading] = useState(false)
@@ -209,12 +264,13 @@ function DeepAnalysisButton({ post }: { post: SentimentPost }) {
     return () => clearInterval(timer)
   }, [status, post.id])
 
-  const statusStyle = {
+  const styleMap: Record<string, { bg: string; border: string; color: string; text: string; hint: string }> = {
     idle: { bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', text: '🎧 深度分析', hint: '下载音频+转录+AI摘要' },
     processing: { bg: '#eff6ff', border: '#93c5fd', color: '#2563eb', text: '⏳ 分析中...', hint: '下载音频 → 转录 → AI摘要' },
     completed: { bg: '#f0fdf4', border: '#86efac', color: '#16a34a', text: '✅ 深度分析已完成', hint: '页面刷新后可见' },
     failed: { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', text: '❌ 深度分析失败', hint: '点击重试' },
-  }[status] || statusStyle.idle
+  }
+  const statusStyle = styleMap[status] || styleMap.idle
 
   return (
     <div style={{ marginBottom: 10 }}>
@@ -518,6 +574,8 @@ export default function SentimentPage() {
                     {post.platform === 'youtube' && (
                       <DeepAnalysisButton post={post} />
                     )}
+                    <QuotedTweet quotedTweetJson={post.quoted_tweet_json} />
+                    <LinkCard cardJson={post.card_json} />
                     <PostImages imagesJson={post.images_json} />
                     <PostVideos videosJson={post.videos_json} />
                     <PostComments commentsJson={post.comments_json} />

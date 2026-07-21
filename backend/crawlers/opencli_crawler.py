@@ -6,6 +6,7 @@ OpenCLI 爬虫 - 通过 opencli CLI 调用平台适配器
 import asyncio
 import json
 import logging
+import re
 import shutil
 from urllib.parse import urlparse
 
@@ -68,7 +69,10 @@ def _extract_image_urls(item: dict, max_images: int = 5) -> list[str]:
                 if url and media_type in ("photo", "image", ""):
                     urls.append(url)
             elif isinstance(m, str) and m.startswith("http"):
-                urls.append(m)
+                # Skip video URLs (mp4, mov, etc.) — only include image URLs
+                ext_match = re.search(r"\.(mp4|mov|avi|webm|mkv|flv)(\?|$)", m.lower())
+                if not ext_match:
+                    urls.append(m)
         if urls:
             break
     # 单独尝试 cover 字段（小红书等）
@@ -88,7 +92,7 @@ def _parse_twitter_posts(data) -> list[PostData]:
     posts = []
     items = data if isinstance(data, list) else [data]
 
-    for item in items[:10]:
+    for item in items:
         try:
             if isinstance(item, dict):
                 text = item.get("text", "") or item.get("full_text", "")
@@ -99,10 +103,32 @@ def _parse_twitter_posts(data) -> list[PostData]:
                 views = int(item.get("views", 0) or 0)
                 shares = int(item.get("retweets", 0) or 0)
                 comments_count = int(item.get("replies", 0) or 0)
+                bookmarks = int(item.get("bookmarks", 0) or 0)
+                author_name = item.get("name", "") or ""
+                author_avatar = item.get("avatar", "") or ""
                 images = _extract_image_urls(item)
+                quoted_tweet = item.get("quoted_tweet") or None
+                card = item.get("card") or None
+
+                # Parse created_at to published_at (format: "Wed Jul 15 18:57:47 +0000 2026")
+                published_at = None
+                created_at_str = item.get("created_at", "")
+                if created_at_str:
+                    try:
+                        from datetime import datetime
+                        published_at = datetime.strptime(
+                            created_at_str, "%a %b %d %H:%M:%S %z %Y"
+                        ).replace(tzinfo=None)
+                    except Exception:
+                        pass
+
                 posts.append(PostData(
                     url=url, content=text, likes=likes, views=views,
-                    shares=shares, comments_count=comments_count, images=images,
+                    shares=shares, comments_count=comments_count,
+                    bookmarks=bookmarks, author_name=author_name,
+                    author_avatar=author_avatar, author_followers=0,
+                    published_at=published_at, images=images,
+                    quoted_tweet=quoted_tweet, card=card,
                 ))
         except Exception:
             continue

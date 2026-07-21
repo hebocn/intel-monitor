@@ -27,6 +27,7 @@ PLATFORM_MAU_DEFAULTS = {
     "toutiao": 350_000_000,
     "108community": 500_000,
     "youtube": 2_500_000_000,
+    "x": 500_000_000,
 }
 
 DEFAULT_HALF_LIFE_DAYS = 4.0

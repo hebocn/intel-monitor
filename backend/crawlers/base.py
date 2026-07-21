@@ -32,6 +32,8 @@ class PostData:
     comments: list[CommentData] = field(default_factory=list)
     images: list[str] = field(default_factory=list)
     videos: list[dict] = field(default_factory=list)
+    quoted_tweet: dict | None = None
+    card: dict | None = None
 
 
 @dataclass

@@ -21,5 +21,5 @@ class SentimentTask(Base):
 
     posts: Mapped[list["SentimentPost"]] = relationship(
         "SentimentPost", back_populates="task", cascade="all, delete-orphan",
-        order_by="SentimentPost.impact_score.desc()"
+        order_by="SentimentPost.sort_order.asc()"
     )

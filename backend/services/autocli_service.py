@@ -300,6 +300,16 @@ async def fetch_hot_topics(platform: str, limit: int = 30) -> list[TopicItem]:
         logger.error(f"[AutoCLI] {platform} JSON parse error: {e}")
         raise RuntimeError(f"autocli 返回无效 JSON")
     except FileNotFoundError:
+        # AutoCLI not installed — try Playwright fallback for browser-mode platforms
+        if PLATFORM_MODES.get(platform) == "browser":
+            logger.warning(f"[AutoCLI] autocli not found, trying Playwright fallback for {platform}...")
+            try:
+                if platform == "weibo":
+                    topics = await _fetch_weibo_hot_via_playwright(limit)
+                    logger.info(f"[Playwright] {platform}: got {len(topics)} topics via fallback")
+                    return topics
+            except Exception as pw_err:
+                logger.error(f"[Playwright] {platform} fallback also failed: {pw_err}")
         logger.error(f"[AutoCLI] autocli not found in PATH")
         raise RuntimeError("autocli 命令未找到，请确认已安装")
     except RuntimeError:

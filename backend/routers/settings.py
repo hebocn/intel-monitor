@@ -394,7 +394,7 @@ async def get_provider_key(provider: str, user=Depends(get_current_user)):
         label=p["label"],
         has_key=bool(key),
         masked_key=_mask_key(key) if key else "",
-        base_url=getattr(settings, p["url_env"], p["default_url"]),
+        base_url=getattr(settings, p["url_env"], p["default_url"]) if p["url_env"] else p["default_url"],
         model=getattr(settings, p["model_env"], p["default_model"]) if p["model_env"] else "",
     )
 

@@ -139,3 +139,12 @@ export const intelligenceAPI = {
 }
 
 export default api
+
+// Account Match
+export const accountMatchAPI = {
+  search: (data: { target_name: string; platforms: string[]; match_mode?: string; anchor_platform?: string }) =>
+    api.post('/account-match/search', data),
+  listTasks: () => api.get('/account-match/tasks'),
+  getTask: (id: number) => api.get(`/account-match/tasks/${id}`),
+  deleteTask: (id: number) => api.delete(`/account-match/tasks/${id}`),
+}

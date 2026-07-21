@@ -33,8 +33,11 @@ class SentimentPost(Base):
     images_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     videos_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     comments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quoted_tweet_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    card_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     score_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     deep_analysis_status: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     task: Mapped["SentimentTask"] = relationship("SentimentTask", back_populates="posts")

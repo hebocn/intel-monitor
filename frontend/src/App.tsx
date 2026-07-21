@@ -10,6 +10,7 @@ import SettingsPage from './pages/SettingsPage'
 import HotTopicsPage from './pages/HotTopicsPage'
 import SentimentPage from './pages/SentimentPage'
 import IntelligenceReportPage from './pages/IntelligenceReportPage'
+import AccountMatchPage from './pages/AccountMatchPage'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -41,6 +42,7 @@ function App() {
                 <Route path="/hot-topics" element={<HotTopicsPage />} />
                 <Route path="/sentiment" element={<SentimentPage />} />
                 <Route path="/intelligence" element={<IntelligenceReportPage />} />
+                <Route path="/account-match" element={<AccountMatchPage />} />
               </Routes>
             </AppLayout>
           ) : <Navigate to="/login" />
