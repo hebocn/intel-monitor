@@ -69,6 +69,15 @@ PROVIDERS = {
         "parser": "youtube",  # custom test: hit videos.list with chart=mostPopular
         "label": "YouTube Data API v3",
     },
+    "google_cse": {
+        "key_env": "GOOGLE_CSE_ID",
+        "url_env": None,
+        "model_env": None,
+        "default_url": "https://cse.google.com/cse",
+        "default_model": "",
+        "parser": "google_cse",  # validate CSE ID format + page loads
+        "label": "Google CSE（Facebook 搜索）",
+    },
 }
 
 
@@ -208,6 +217,30 @@ async def _test_key(provider: str, api_key: str) -> dict:
                     return {"success": False, "message": "YouTube API 日配额已用尽"}
                 return {"success": False, "message": "API Key 无效或被限制"}
             return {"success": False, "message": f"YouTube API HTTP {resp.status_code}"}
+        except httpx.TimeoutException:
+            return {"success": False, "message": "连接超时，请检查网络"}
+        except Exception as e:
+            return {"success": False, "message": f"连接失败: {str(e)}"}
+
+    # Special handling for Google CSE — validate by loading the CSE page
+    if provider == "google_cse":
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    f"https://cse.google.com/cse?cx={api_key}",
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+                )
+            if resp.status_code == 200:
+                # Check that the page contains a CSE search box (not an error page)
+                text = resp.text
+                if "gsc.tab" in text or "cse.google.com" in text:
+                    return {"success": True, "message": "Google CSE ID 验证成功"}
+                if "找不到" in text or "not found" in text.lower() or "invalid" in text.lower():
+                    return {"success": False, "message": "CSE ID 无效（搜索引擎不存在）"}
+                return {"success": True, "message": "Google CSE ID 验证成功（页面已加载）"}
+            if resp.status_code == 400:
+                return {"success": False, "message": "CSE ID 格式无效"}
+            return {"success": False, "message": f"Google CSE HTTP {resp.status_code}"}
         except httpx.TimeoutException:
             return {"success": False, "message": "连接超时，请检查网络"}
         except Exception as e:

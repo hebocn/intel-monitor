@@ -34,6 +34,7 @@ PLATFORM_INFO = {
     "108community": {"label": "108天台社区", "metrics": ["comments"]},
     "youtube": {"label": "YouTube", "metrics": ["views", "likes", "comments"]},
     "x": {"label": "X (Twitter)", "metrics": ["views", "likes", "comments", "shares", "bookmarks"]},
+    "facebook": {"label": "Facebook", "metrics": ["likes", "comments", "shares"]},
 }
 
 

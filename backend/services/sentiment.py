@@ -69,6 +69,8 @@ async def run_sentiment_search(task_id: int, keyword: str, platforms: list[str],
                         await _generate_youtube_summaries(result.posts)
                 elif platform == "x":
                     result = await _search_x(keyword, post_limit)
+                elif platform == "facebook":
+                    result = await _search_facebook(keyword, post_limit)
                 else:
                     return platform, [], f"Unsupported platform: {platform}"
 
@@ -251,6 +253,17 @@ async def _search_x(keyword: str, limit: int):
         logger.exception("X Playwright search error")
         from crawlers.base import CrawlResult
         return CrawlResult(success=False, error_message=str(e))
+
+
+async def _search_facebook(keyword: str, limit: int):
+    """Search Facebook via Google CSE + Playwright headless browser.
+
+    Uses Google CSE to find Facebook content, then clicks into public text
+    posts (/posts/) to extract full content. Video and photo posts are skipped
+    (login wall).
+    """
+    from crawlers.facebook_cse_search import search_facebook
+    return await _run_crawler_in_thread(search_facebook(keyword, limit))
 
 
 async def _fetch_x_comments_for_posts(posts: list, max_comments_per_post: int = 5):

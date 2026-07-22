@@ -28,6 +28,7 @@ PLATFORM_MAU_DEFAULTS = {
     "108community": 500_000,
     "youtube": 2_500_000_000,
     "x": 500_000_000,
+    "facebook": 600_000_000,
 }
 
 DEFAULT_HALF_LIFE_DAYS = 4.0

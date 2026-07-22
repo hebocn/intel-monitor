@@ -20,6 +20,7 @@ const serviceProviders = [
   { key: 'firecrawl', label: 'Firecrawl', color: '#d97706', desc: 'Web 搜索 + 全文抓取 · 开源情报核心引擎' },
   { key: 'tavily', label: 'Tavily', color: '#0891b2', desc: 'AI 驱动 Web 搜索 · 深度内容提取' },
   { key: 'youtube', label: 'YouTube', color: '#FF0000', desc: 'YouTube Data API v3 · 关键词搜索 + 视频元数据' },
+  { key: 'google_cse', label: 'Google CSE', color: '#4285F4', desc: 'Facebook 搜索 · Google 自定义搜索引擎 ID' },
 ]
 
 // All providers for backward compat in status loading
@@ -324,6 +325,7 @@ export default function SettingsPage() {
     firecrawl: { ...defaultState },
     tavily: { ...defaultState },
     youtube: { ...defaultState },
+    google_cse: { ...defaultState },
   })
 
   const updateProvider = useCallback((key: string, patch: Partial<ProviderState>) => {

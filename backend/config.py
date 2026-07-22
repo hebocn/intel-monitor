@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # YouTube Data API v3
     YOUTUBE_API_KEY: str = ""
 
+    # Google Custom Search Engine (CSE) — Facebook search
+    GOOGLE_CSE_ID: str = "016621447308871563343:vylfmzjmlti"
+
     # AI Prompts
     SUMMARIZE_POSTS_PROMPT: str = (
         "你是一个情报分析助手。请对以下社交媒体账号今日发布的内容进行简洁总结。"

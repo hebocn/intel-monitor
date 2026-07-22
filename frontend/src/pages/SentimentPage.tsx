@@ -34,8 +34,8 @@ interface SentimentTask {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
-const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000', x: '#000000' }
-const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube', x: 'X' }
+const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000', x: '#000000', facebook: '#1877F2' }
+const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube', x: 'X', facebook: 'Facebook' }
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:   { color: '#f59e0b', icon: <ClockCircleOutlined />,   text: '等待' },
   running:   { color: '#3b82f6', icon: <SyncOutlined spin />,      text: '搜索中' },
