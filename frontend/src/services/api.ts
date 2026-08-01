@@ -110,6 +110,8 @@ export const sentimentAPI = {
   deleteTask: (id: number) => api.delete(`/sentiment/tasks/${id}`),
   triggerDeepAnalysis: (postId: number) => api.post(`/sentiment/posts/${postId}/deep-analyze`),
   getDeepAnalysisStatus: (postId: number) => api.get(`/sentiment/posts/${postId}/deep-analyze`),
+  checkCDPStatus: () => api.get('/tools/cdp-status'),
+  repairCDP: () => api.post('/tools/cdp-repair'),
 }
 
 // Intelligence Reports

@@ -29,6 +29,7 @@ PLATFORM_MAU_DEFAULTS = {
     "youtube": 2_500_000_000,
     "x": 500_000_000,
     "facebook": 600_000_000,
+    "telegram_kuai": 900_000_000,
 }
 
 DEFAULT_HALF_LIFE_DAYS = 4.0

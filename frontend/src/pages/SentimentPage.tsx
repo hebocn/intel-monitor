@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Input, Button, Tag, Space, Select, message, Skeleton, Empty, Spin, Row, Col,
-  Image, Badge, Tooltip,
+  Image, Badge, Tooltip, Popover,
 } from 'antd'
 import {
   SearchOutlined, ClockCircleOutlined, CheckCircleOutlined,
@@ -348,6 +348,9 @@ export default function SentimentPage() {
   const [selectedTask, setSelectedTask] = useState<SentimentTask | null>(null)
   const [loadingTasks, setLoadingTasks] = useState(true)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [cdpStatus, setCDPStatus] = useState<{ cdp_proxy_running: boolean; chrome_connected: boolean; chrome_port: number | null; message: string; diagnosis?: string; steps?: string[] } | null>(null)
+  const [checkingCDP, setCheckingCDP] = useState(false)
+  const [repairingCDP, setRepairingCDP] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -357,6 +360,35 @@ export default function SentimentPage() {
     }).catch(() => message.error('加载平台列表失败'))
     fetchTasks()
   }, [])
+
+  const checkCDP = async () => {
+    setCheckingCDP(true)
+    try {
+      const res = await sentimentAPI.checkCDPStatus()
+      setCDPStatus(res.data)
+    } catch {
+      setCDPStatus({ cdp_proxy_running: false, chrome_connected: false, chrome_port: null, message: '检测失败，请检查后端是否运行' })
+    }
+    setCheckingCDP(false)
+  }
+
+  const repairCDP = async () => {
+    setRepairingCDP(true)
+    try {
+      const res = await sentimentAPI.repairCDP()
+      if (res.data.success) {
+        message.success(res.data.message || 'CDP 已修复')
+      } else {
+        message.warning(res.data.message || '自动修复未完全成功')
+      }
+      // Re-check status after repair
+      const statusRes = await sentimentAPI.checkCDPStatus()
+      setCDPStatus(statusRes.data)
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '修复失败')
+    }
+    setRepairingCDP(false)
+  }
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
@@ -445,6 +477,63 @@ export default function SentimentPage() {
               </Tag.CheckableTag>
             )
           })}
+          {/* CDP Status indicator */}
+          <Popover
+            trigger="click"
+            placement="bottomRight"
+            title={
+              !cdpStatus ? 'CDP 状态检测'
+              : cdpStatus.chrome_connected ? 'CDP 连接正常'
+              : `CDP 异常 — ${cdpStatus.diagnosis || ''}`
+            }
+            content={
+              !cdpStatus
+                ? <span style={{ fontSize: 13, color: '#64748b' }}>点击标签检测浏览器驱动状态</span>
+                : cdpStatus.chrome_connected
+                ? <span style={{ fontSize: 13, color: '#16a34a' }}>{cdpStatus.message}</span>
+                : <div style={{ maxWidth: 340 }}>
+                    <p style={{ fontSize: 13, color: '#475569', marginBottom: 12, fontWeight: 500 }}>
+                      {cdpStatus.message}
+                    </p>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={repairingCDP ? <SyncOutlined spin /> : undefined}
+                      loading={repairingCDP}
+                      onClick={(e) => { e.stopPropagation(); repairCDP() }}
+                      style={{
+                        background: '#16a34a', borderColor: '#16a34a',
+                        borderRadius: 6, fontWeight: 500,
+                      }}
+                    >
+                      {repairingCDP ? '修复中...' : '一键修复'}
+                    </Button>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
+                      将尝试自动启动 CDP Proxy 并唤起 Chrome 远程调试
+                    </div>
+                  </div>
+            }
+          >
+            <Tag
+              style={{
+                borderRadius: 20, padding: '2px 14px', fontSize: 12, fontWeight: 500,
+                border: `1px solid ${!cdpStatus ? '#e2e8f0' : cdpStatus.chrome_connected ? '#86efac' : '#fecaca'}`,
+                background: !cdpStatus ? '#f8fafc' : cdpStatus.chrome_connected ? '#f0fdf4' : '#fef2f2',
+                color: !cdpStatus ? '#94a3b8' : cdpStatus.chrome_connected ? '#16a34a' : '#dc2626',
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+              onClick={checkCDP}
+            >
+              {checkingCDP
+                ? <><SyncOutlined spin style={{ fontSize: 10 }} /> 检测中</>
+                : !cdpStatus
+                ? <>检测 CDP</>
+                : cdpStatus.chrome_connected
+                ? <><CheckCircleOutlined style={{ fontSize: 10 }} /> CDP 正常</>
+                : <><CloseCircleOutlined style={{ fontSize: 10 }} /> CDP 异常</>
+              }
+            </Tag>
+          </Popover>
           <Tooltip title="影响力 = 互动得分 × 平台权重 × 时间衰减 × 100">
             <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', cursor: 'help' }}>评分说明</span>
           </Tooltip>
@@ -531,6 +620,34 @@ export default function SentimentPage() {
                   <Button size="small" danger type="text" icon={<DeleteOutlined />} onClick={() => handleDeleteTask(selectedTask.id)} />
                 </div>
               </div>
+
+              {/* Error Log Banner */}
+              {selectedTask.error_log && (() => {
+                try {
+                  const errs = JSON.parse(selectedTask.error_log)
+                  const entries = Object.entries(errs)
+                  if (!entries.length) return null
+                  return (
+                    <div style={{
+                      marginBottom: 16, padding: '14px 18px',
+                      background: '#fffbeb', borderRadius: R.md,
+                      border: '1px solid #fde68a',
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>
+                        ⚠️ 部分平台搜索异常
+                      </div>
+                      {entries.map(([platform, msg]) => (
+                        <div key={platform} style={{ fontSize: 12, color: '#a16207', marginBottom: 4, lineHeight: 1.6 }}>
+                          <Tag color="gold" style={{ marginRight: 6, fontSize: 11 }}>
+                            {PLATFORM_LABELS[platform] || platform}
+                          </Tag>
+                          {String(msg)}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                } catch { return null }
+              })()}
 
               {/* Post Cards */}
               {selectedTask.posts?.length === 0 ? (

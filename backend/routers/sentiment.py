@@ -35,6 +35,7 @@ PLATFORM_INFO = {
     "youtube": {"label": "YouTube", "metrics": ["views", "likes", "comments"]},
     "x": {"label": "X (Twitter)", "metrics": ["views", "likes", "comments", "shares", "bookmarks"]},
     "facebook": {"label": "Facebook", "metrics": ["likes", "comments", "shares"]},
+    "telegram_kuai": {"label": "Telegram 快搜", "metrics": []},
 }
 
 

@@ -71,6 +71,8 @@ async def run_sentiment_search(task_id: int, keyword: str, platforms: list[str],
                     result = await _search_x(keyword, post_limit)
                 elif platform == "facebook":
                     result = await _search_facebook(keyword, post_limit)
+                elif platform == "telegram_kuai":
+                    result = await _search_telegram_kuai(keyword, post_limit)
                 else:
                     return platform, [], f"Unsupported platform: {platform}"
 
@@ -264,6 +266,24 @@ async def _search_facebook(keyword: str, limit: int):
     """
     from crawlers.facebook_cse_search import search_facebook
     return await _run_crawler_in_thread(search_facebook(keyword, limit))
+
+
+async def _search_telegram_kuai(keyword: str, limit: int):
+    """Search Telegram via @kuai Bot using Playwright persistent context.
+
+    Requires one-time initialization: ``python backend/scripts/init_telegram.py``
+    to scan the QR code and persist the session.  Subsequent runs reuse the
+    saved profile and do not require re-login.
+
+    Search flow:
+    1. Navigate to @kuai chat
+    2. Send keyword, wait for Bot reply
+    3. Filter results (skip ads, video-only, non-matching titles)
+    4. Serial deep-fetch: click each result → extract body → return
+    5. Return CrawlResult with PostData list
+    """
+    from crawlers.telegram import search_kuai
+    return await _run_crawler_in_thread(search_kuai(keyword, limit))
 
 
 async def _fetch_x_comments_for_posts(posts: list, max_comments_per_post: int = 5):
