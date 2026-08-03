@@ -267,7 +267,10 @@ class ContentSummarizer:
 
         try:
             result = await self._call_ai(system_prompt, comments_text)
-            indices = [int(x.strip()) - 1 for x in result.split(",") if x.strip().isdigit()]
+            logger.info(f"[summarizer] AI 精选评论返回: {result[:200]!r} (候选 {len(candidates)} 条)")
+            indices = [int(x.strip()) - 1 for x in result.replace("\n", ",").split(",") if x.strip().isdigit()]
+            if not indices:
+                return candidates[:max_count]
             return [candidates[i] for i in indices if 0 <= i < len(candidates)][:max_count]
         except Exception:
             return candidates[:max_count]

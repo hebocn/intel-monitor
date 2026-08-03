@@ -127,10 +127,14 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
                     if post.url:
                         try:
                             comments = await _run_crawler_in_thread(playwright_crawler.get_hot_comments(post.url))
+                            for c in comments:
+                                c.url = post.url  # 回填所属帖子 URL，供每帖分组截断使用
                             post.comments = comments
                             all_comments.extend(comments)
-                        except Exception:
-                            pass
+                            logger.info(f"[{target.account_name}] 评论抓取: {post.url[-20:]} -> {len(comments)} 条")
+                        except Exception as e:
+                            logger.warning(f"[{target.account_name}] 评论抓取失败: {post.url[-20:]} ({e})")
+                logger.info(f"[{target.account_name}] 评论汇总: {len(all_comments)} 条")
 
         # OpenCLI 方式：X 平台通过 opencli twitter thread 复用登录态抓取评论
         # 只对热度最高的前 5 帖抓评论 + 帖间限速，避免触发 Twitter 会话限流 (429)
