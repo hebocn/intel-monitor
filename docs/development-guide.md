@@ -132,6 +132,17 @@ ALTER TABLE sentiment_posts ADD COLUMN comments_json TEXT;
 
 新表在启动时通过 `Base.metadata.create_all` 自动创建，但现有表不会自动加列。
 
+**按帖热门评论功能（2026-08 新增）**，旧库需执行：
+
+```sql
+-- hot_comments：帖内评论互动数 + 全局 TOP10 排名
+ALTER TABLE hot_comments ADD COLUMN reply_count INTEGER DEFAULT 0;
+ALTER TABLE hot_comments ADD COLUMN retweet_count INTEGER DEFAULT 0;
+ALTER TABLE hot_comments ADD COLUMN global_rank INTEGER DEFAULT 0;
+-- monitor_results：AI 精选状态（idle/selecting/done）
+ALTER TABLE monitor_results ADD COLUMN comments_ai_status VARCHAR(20) DEFAULT 'idle';
+```
+
 ---
 
 ## 功能模块
