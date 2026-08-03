@@ -55,6 +55,7 @@ export const resultsAPI = {
   list: (params: any) => api.get('/results', { params }),
   detail: (id: number) => api.get(`/results/${id}`),
   delete: (id: number) => api.delete(`/results/${id}`),
+  fetchComments: (id: number, postUrl: string) => api.post(`/results/${id}/comments/fetch`, { post_url: postUrl }),
 }
 
 // Dashboard

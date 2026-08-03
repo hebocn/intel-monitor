@@ -1,17 +1,20 @@
 # intel-monitor/backend/services/monitor.py
+import asyncio
 import json
 import logging
 from datetime import date
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database import async_session
 from models.target import Target
 from models.website import WebsiteTarget
 from models.result import MonitorResult
 from models.comment import HotComment
-from crawlers import CRAWLER_MAP, WebsiteCrawler, OpenCLICrawler, get_router
+from crawlers import CRAWLER_MAP, WebsiteCrawler, get_router
 from crawlers.base import filter_posts, _run_crawler_in_thread
 from services.summarizer import summarizer
 
@@ -117,42 +120,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             await db.commit()
             return
 
-        all_comments = []
-        # Playwright 方式：各平台 get_hot_comments（微博 hotflow API / X 页面回复等）
-        if method == "playwright":
-            crawler_cls = CRAWLER_MAP.get(target.platform)
-            if crawler_cls:
-                playwright_crawler = crawler_cls()
-                for post in crawl_result.posts:
-                    if post.url:
-                        try:
-                            comments = await _run_crawler_in_thread(playwright_crawler.get_hot_comments(post.url))
-                            for c in comments:
-                                c.url = post.url  # 回填所属帖子 URL，供每帖分组截断使用
-                            post.comments = comments
-                            all_comments.extend(comments)
-                            logger.info(f"[{target.account_name}] 评论抓取: {post.url[-20:]} -> {len(comments)} 条")
-                        except Exception as e:
-                            logger.warning(f"[{target.account_name}] 评论抓取失败: {post.url[-20:]} ({e})")
-                logger.info(f"[{target.account_name}] 评论汇总: {len(all_comments)} 条")
-
-        # OpenCLI 方式：X 平台通过 opencli twitter thread 复用登录态抓取评论
-        # 只对热度最高的前 5 帖抓评论 + 帖间限速，避免触发 Twitter 会话限流 (429)
-        elif method == "opencli" and target.platform == "x":
-            opencli_crawler = OpenCLICrawler(platform="x")
-            top_posts = sorted(
-                [p for p in crawl_result.posts if p.url],
-                key=lambda p: p.likes + p.comments_count * 2,
-                reverse=True,
-            )[:5]
-            for post in top_posts:
-                try:
-                    comments = await opencli_crawler.get_hot_comments(post.url)
-                    post.comments = comments
-                    all_comments.extend(comments)
-                    await asyncio.sleep(3)
-                except Exception:
-                    pass
+        # 评论改为按需获取：监控只抓帖子，用户在前端逐帖点击「获取评论」后才抓取并入库
 
         # 图片提取统计
         img_count = sum(len(p.images) for p in crawl_result.posts)
@@ -165,7 +133,6 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
         # Summarize
         logger.info(f"[{target.account_name}] 开始生成摘要{'(含图片分析)' if img_count > 0 else ''}")
         summary = await summarizer.summarize_posts(target.platform, target.account_name, crawl_result.posts)
-        hot = await summarizer.extract_hot_comments(all_comments)
         logger.info(f"[{target.account_name}] 摘要完成, 长度: {len(summary)} 字符")
 
         # Save results
@@ -175,18 +142,6 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             ensure_ascii=False,
         )
         monitor_result.status = "success"
-
-        # Save hot comments
-        for i, comment in enumerate(hot):
-            db.add(HotComment(
-                monitor_result_id=monitor_result.id,
-                post_url=comment.url,
-                comment_text=comment.text,
-                author=comment.author,
-                likes_count=comment.likes,
-                rank=i + 1,
-            ))
-
         await db.commit()
         logger.info(f"[{target.account_name}] === 监控完成 (结果ID: {monitor_result.id}) ===")
 
@@ -265,3 +220,143 @@ async def monitor_all_active():
                 await execute_monitor(website.id, "website")
             except Exception:
                 pass
+
+
+async def fetch_post_comments(monitor_result_id: int, post_url: str) -> dict:
+    """Fetch hot comments for a single post (on-demand) and store them.
+
+    Returns {"comments": N, "rank": 1} where rank is the in-post rank of the
+    top comment (0 if none). Errors raise HTTPException with detail message.
+    """
+    async with async_session() as db:
+        result = await db.execute(select(MonitorResult).where(MonitorResult.id == monitor_result_id))
+        monitor_result = result.scalar_one_or_none()
+        if not monitor_result:
+            raise HTTPException(status_code=404, detail="结果不存在")
+
+        target_result = await db.execute(select(Target).where(Target.id == monitor_result.target_id))
+        target = target_result.scalar_one_or_none()
+        if not target:
+            raise HTTPException(status_code=404, detail="监控目标不存在")
+
+        crawler_cls = CRAWLER_MAP.get(target.platform)
+        if not crawler_cls:
+            raise HTTPException(status_code=400, detail=f"平台 {target.platform} 不支持评论获取")
+
+        # 抓取前先标记精选中（idle -> selecting）
+        monitor_result.comments_ai_status = "selecting"
+        await db.commit()
+
+        try:
+            crawler = crawler_cls()
+            comments = await _run_crawler_in_thread(crawler.get_hot_comments(post_url))
+        except Exception as e:
+            monitor_result.comments_ai_status = "idle"
+            await db.commit()
+            logger.warning(f"[{target.account_name}] 评论抓取失败: {post_url[-30:]} ({e})")
+            raise HTTPException(status_code=500, detail=f"评论抓取失败: {e}")
+
+        for c in comments:
+            c.url = post_url
+
+        # 覆盖写入：先删该帖旧评论，再写新评论（帖内 rank 1-10）
+        await db.execute(
+            delete(HotComment).where(
+                HotComment.monitor_result_id == monitor_result.id,
+                HotComment.post_url == post_url,
+            )
+        )
+        for i, c in enumerate(comments[:10]):
+            db.add(HotComment(
+                monitor_result_id=monitor_result.id,
+                post_url=post_url,
+                comment_text=c.text,
+                author=c.author,
+                likes_count=c.likes,
+                reply_count=c.reply_count,
+                retweet_count=c.retweet_count,
+                rank=i + 1,
+            ))
+        await db.commit()
+        logger.info(f"[{target.account_name}] 按需评论: {post_url[-20:]} -> {len(comments)} 条 (结果ID: {monitor_result.id})")
+
+        # 触发异步 AI 精选全局 TOP10（后台任务，不阻塞响应）
+        asyncio.create_task(select_global_hot_comments(monitor_result.id))
+        return {"comments": len(comments), "rank": 1 if comments else 0}
+
+
+async def _reset_global_ranks(db, monitor_result_id: int):
+    """清空该结果所有评论的全局排名（精选重算前调用）。"""
+    from sqlalchemy import update
+    await db.execute(
+        update(HotComment)
+        .where(HotComment.monitor_result_id == monitor_result_id)
+        .values(global_rank=0)
+    )
+    await db.commit()
+
+
+async def select_global_hot_comments(monitor_result_id: int):
+    """Select global TOP10 hot comments from all stored comments via AI (background)."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(MonitorResult)
+            .options(selectinload(MonitorResult.hot_comments))
+            .where(MonitorResult.id == monitor_result_id)
+        )
+        monitor_result = result.scalar_one_or_none()
+        if not monitor_result:
+            return
+        try:
+            await _reset_global_ranks(db, monitor_result.id)
+            all_comments = monitor_result.hot_comments
+            if not all_comments:
+                monitor_result.comments_ai_status = "idle"
+                await db.commit()
+                return
+            # 按帖分组取每帖热度 TOP3 作为候选（防单帖霸榜）
+            by_post: dict[str, list] = {}
+            for c in all_comments:
+                by_post.setdefault(c.post_url, []).append(c)
+            def _heat(c):
+                return c.likes_count + max(c.reply_count, c.retweet_count) * 2
+            truncated = []
+            for post_comments in by_post.values():
+                post_comments.sort(key=_heat, reverse=True)
+                truncated.extend(post_comments[:3])
+            sorted_comments = sorted(truncated, key=_heat, reverse=True)
+            candidates = sorted_comments[:20]
+
+            if len(candidates) <= 10:
+                for i, c in enumerate(sorted_comments[:10]):
+                    c.global_rank = i + 1
+                monitor_result.comments_ai_status = "done"
+                await db.commit()
+                return
+
+            def _fmt(c):
+                extra = ""
+                if c.reply_count: extra = f",{c.reply_count}回复"
+                elif c.retweet_count: extra = f",{c.retweet_count}转发"
+                return f"[{c.likes_count}赞{extra}] {c.author}: {c.comment_text[:100]}"
+            comments_text = "\n".join(f"{i+1}. {_fmt(c)}" for i, c in enumerate(candidates))
+            system_prompt = (
+                "从以下评论中选出最有价值、最热门的10条。"
+                "按热度排序，返回编号列表，每行一个编号。"
+                "只返回编号，如: 1,3,5,7,9,11,13,15,17,19"
+            )
+            result = await summarizer._call_ai(system_prompt, comments_text)
+            indices = [int(x.strip()) - 1 for x in result.replace("\n", ",").split(",") if x.strip().isdigit()]
+            chosen = [candidates[i] for i in indices if 0 <= i < len(candidates)][:10]
+            if not chosen:
+                chosen = sorted_comments[:10]
+            # 写全局 rank 1-10（帖内 rank 保留）
+            for i, c in enumerate(chosen):
+                c.global_rank = i + 1
+            monitor_result.comments_ai_status = "done"
+            await db.commit()
+            logger.info(f"[monitor] AI 精选全局 TOP10 完成: {len(chosen)} 条 (结果ID: {monitor_result.id})")
+        except Exception as e:
+            monitor_result.comments_ai_status = "idle"
+            await db.commit()
+            logger.exception(f"[monitor] AI 精选失败 (结果ID: {monitor_result.id}): {e}")
