@@ -225,6 +225,14 @@ export default function MonitorDetailPage() {
 
   useEffect(() => { fetchResults() }, [id, type, statusFilter])
 
+  // 列表轮询：存在「进行中」记录时每 3s 刷新，任务完成后自动更新
+  useEffect(() => {
+    const hasPending = results.some((r: any) => r.status === 'pending')
+    if (!hasPending) return
+    const timer = setInterval(fetchResults, 3000)
+    return () => clearInterval(timer)
+  }, [results])
+
   const loadDetail = async (resultId: number) => {
     const res = await resultsAPI.detail(resultId)
     setSelectedResult(res.data)
