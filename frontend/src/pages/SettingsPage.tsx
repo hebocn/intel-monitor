@@ -74,11 +74,12 @@ function ProviderCard({
         onStateChange({
           testResult: { success: d.success, message: d.message, reply: d.reply },
           testing: false,
+          saving: false,
         })
         if (d.success) message.success(`${provider.label} 验证通过`)
         else message.warning(d.message)
       } catch {
-        onStateChange({ testResult: { success: false, message: '测试请求失败' }, testing: false })
+        onStateChange({ testResult: { success: false, message: '测试请求失败' }, testing: false, saving: false })
       }
     } catch (err: any) {
       message.error(err.response?.data?.detail || '保存失败')
