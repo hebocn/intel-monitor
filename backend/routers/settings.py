@@ -199,7 +199,6 @@ async def _test_key(provider: str, api_key: str) -> dict:
                         "part": "snippet",
                         "chart": "mostPopular",
                         "maxResults": 1,
-                        "regionCode": "CN",
                         "key": api_key,
                     },
                 )
@@ -216,7 +215,15 @@ async def _test_key(provider: str, api_key: str) -> dict:
                 if reason == "quotaExceeded":
                     return {"success": False, "message": "YouTube API 日配额已用尽"}
                 return {"success": False, "message": "API Key 无效或被限制"}
-            return {"success": False, "message": f"YouTube API HTTP {resp.status_code}"}
+            # 透出 YouTube 返回的具体错误信息，便于定位（如 regionCode 无效等）
+            detail = ""
+            if resp.text:
+                try:
+                    body = resp.json()
+                    detail = body.get("error", {}).get("message", "")
+                except Exception:
+                    detail = resp.text[:200]
+            return {"success": False, "message": f"YouTube API HTTP {resp.status_code}: {detail}"}
         except httpx.TimeoutException:
             return {"success": False, "message": "连接超时，请检查网络"}
         except Exception as e:
