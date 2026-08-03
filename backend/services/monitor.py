@@ -11,7 +11,7 @@ from models.target import Target
 from models.website import WebsiteTarget
 from models.result import MonitorResult
 from models.comment import HotComment
-from crawlers import CRAWLER_MAP, WebsiteCrawler, get_router
+from crawlers import CRAWLER_MAP, WebsiteCrawler, OpenCLICrawler, get_router
 from crawlers.base import filter_posts, _run_crawler_in_thread
 from services.summarizer import summarizer
 
@@ -118,7 +118,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             return
 
         all_comments = []
-        # 仅 Playwright 方式尝试获取评论（CDP 和 OpenCLI 暂不支持评论回填）
+        # Playwright 方式：各平台 get_hot_comments（微博 hotflow API / X 页面回复等）
         if method == "playwright":
             crawler_cls = CRAWLER_MAP.get(target.platform)
             if crawler_cls:
@@ -131,6 +131,18 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
                             all_comments.extend(comments)
                         except Exception:
                             pass
+
+        # OpenCLI 方式：X 平台通过 opencli twitter thread 复用登录态抓取评论
+        elif method == "opencli" and target.platform == "x":
+            opencli_crawler = OpenCLICrawler(platform="x")
+            for post in crawl_result.posts:
+                if post.url:
+                    try:
+                        comments = await opencli_crawler.get_hot_comments(post.url)
+                        post.comments = comments
+                        all_comments.extend(comments)
+                    except Exception:
+                        pass
 
         # 图片提取统计
         img_count = sum(len(p.images) for p in crawl_result.posts)
@@ -149,7 +161,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
         # Save results
         monitor_result.summary = summary
         monitor_result.raw_content = json.dumps(
-            [{"title": p.title, "content": p.content, "url": p.url, "likes": p.likes, "images": p.images, "author_name": p.author_name, "author_avatar": p.author_avatar, "published_at": p.published_at.isoformat() if p.published_at else None} for p in crawl_result.posts],
+            [{"title": p.title, "content": p.content, "url": p.url, "likes": p.likes, "comments_count": p.comments_count, "images": p.images, "author_name": p.author_name, "author_avatar": p.author_avatar, "published_at": p.published_at.isoformat() if p.published_at else None} for p in crawl_result.posts],
             ensure_ascii=False,
         )
         monitor_result.status = "success"

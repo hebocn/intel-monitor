@@ -13,6 +13,8 @@ class CommentData:
     author: str
     likes: int = 0
     url: str = ""
+    reply_count: int = 0      # 评论底下的回复数（微博 hotflow）
+    retweet_count: int = 0    # 评论被转发数（X thread）
 
 
 @dataclass
