@@ -216,20 +216,47 @@ class ContentSummarizer:
             return f"总结生成失败: {msg}"
 
     async def extract_hot_comments(
-        self, all_comments: list[CommentData], max_count: int = 10
+        self, all_comments: list[CommentData], max_count: int = 10,
+        per_post_limit: int = 3,
     ) -> list[CommentData]:
+        """挑选最热门的评论。
+
+        热度分 = 点赞×1 + 回复×2（微博）或 点赞×1 + 转发×2（X）。
+        每帖先截断（防单帖霸榜），合并后按热度分排前 2×max_count 候选，
+        再交给 AI 从候选中精选 max_count 条（AI 可见完整互动指标）。
+        """
         if not all_comments:
             return []
 
-        sorted_comments = sorted(all_comments, key=lambda c: c.likes, reverse=True)
+        def _heat(c: CommentData) -> int:
+            return c.likes + max(c.reply_count, c.retweet_count) * 2
+
+        # 每帖截断：按 post.url 分组，取每组热度最高的 per_post_limit 条
+        by_post: dict[str, list[CommentData]] = {}
+        for c in all_comments:
+            by_post.setdefault(c.url, []).append(c)
+        truncated = []
+        for post_comments in by_post.values():
+            post_comments.sort(key=_heat, reverse=True)
+            truncated.extend(post_comments[:per_post_limit])
+
+        sorted_comments = sorted(truncated, key=_heat, reverse=True)
         candidates = sorted_comments[:max_count * 2]
 
         if len(candidates) <= max_count:
             return candidates[:max_count]
 
+        def _fmt(c: CommentData) -> str:
+            if c.reply_count:
+                extra = f"{c.reply_count}回复"
+            elif c.retweet_count:
+                extra = f"{c.retweet_count}转发"
+            else:
+                extra = ""
+            return f"[{c.likes}赞{',' + extra if extra else ''}] {c.author}: {c.text[:100]}"
+
         comments_text = "\n".join(
-            f"{i+1}. [{c.likes}赞] {c.author}: {c.text[:100]}"
-            for i, c in enumerate(candidates)
+            f"{i+1}. {_fmt(c)}" for i, c in enumerate(candidates)
         )
 
         system_prompt = (
@@ -240,7 +267,10 @@ class ContentSummarizer:
 
         try:
             result = await self._call_ai(system_prompt, comments_text)
-            indices = [int(x.strip()) - 1 for x in result.split(",") if x.strip().isdigit()]
+            logger.info(f"[summarizer] AI 精选评论返回: {result[:200]!r} (候选 {len(candidates)} 条)")
+            indices = [int(x.strip()) - 1 for x in result.replace("\n", ",").split(",") if x.strip().isdigit()]
+            if not indices:
+                return candidates[:max_count]
             return [candidates[i] for i in indices if 0 <= i < len(candidates)][:max_count]
         except Exception:
             return candidates[:max_count]

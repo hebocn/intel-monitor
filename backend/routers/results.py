@@ -1,6 +1,7 @@
 # intel-monitor/backend/routers/results.py
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -11,8 +12,13 @@ from models.user import User
 from models.result import MonitorResult
 from models.comment import HotComment
 from schemas.result import ResultResponse, ResultDetailResponse, HotCommentResponse
+from services.monitor import fetch_post_comments
 
 router = APIRouter(prefix="/api/results", tags=["results"])
+
+
+class FetchCommentsRequest(BaseModel):
+    post_url: str
 
 
 @router.get("", response_model=list[ResultResponse])
@@ -51,6 +57,17 @@ async def get_result_detail(
     if not monitor_result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found")
     return monitor_result
+
+
+@router.post("/{result_id}/comments/fetch")
+async def fetch_comments(
+    result_id: int,
+    body: FetchCommentsRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """按需抓取单帖热门评论并入库，随后后台异步 AI 精选全局 TOP10。"""
+    return await fetch_post_comments(result_id, body.post_url)
 
 
 @router.delete("/{result_id}")

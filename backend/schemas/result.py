@@ -12,7 +12,11 @@ class HotCommentResponse(BaseModel):
     comment_text: str
     author: str
     likes_count: int
+    reply_count: int = 0
+    retweet_count: int = 0
     rank: int
+    global_rank: int = 0
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -26,6 +30,7 @@ class ResultResponse(BaseModel):
     status: str
     error_message: Optional[str]
     crawl_method: Optional[str] = None
+    comments_ai_status: str = "idle"
     created_at: datetime
 
     model_config = {"from_attributes": True}

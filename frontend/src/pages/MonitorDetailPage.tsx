@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Tag, Typography, Empty, Select, Popconfirm, message, Image, Tooltip, Skeleton } from 'antd'
+import { Tag, Typography, Empty, Select, Popconfirm, message, Image, Tooltip, Skeleton, Button } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   DeleteOutlined, FilterOutlined, RobotOutlined, FileTextOutlined,
-  HeartOutlined, PictureOutlined,
+  HeartOutlined, CommentOutlined, LoadingOutlined,
 } from '@ant-design/icons'
 import { resultsAPI } from '../services/api'
 
@@ -147,23 +147,23 @@ function ResultCard({
   )
 }
 
-function CommentCard({ comment, rank }: { comment: any; rank: number }) {
+function CommentCard({ comment, rank, compact = false }: { comment: any; rank: number; compact?: boolean }) {
   const isTop3 = rank <= 3
   return (
     <div style={{
       display: 'flex', gap: 14, alignItems: 'flex-start',
-      padding: '14px 18px',
+      padding: '12px 16px',
       background: isTop3 ? 'rgba(45,106,79,0.03)' : 'var(--surface-0, #fff)',
       borderRadius: 12,
       border: isTop3 ? '1px solid rgba(45,106,79,0.12)' : '1px solid var(--border)',
     }}>
       {/* Rank */}
       <div style={{
-        minWidth: 32, height: 32, borderRadius: 10,
+        minWidth: 30, height: 30, borderRadius: 10,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: isTop3 ? '#2d6a4f' : 'var(--surface-1)',
         color: isTop3 ? '#fff' : 'var(--text-muted)',
-        fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+        fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
       }}>
         {rank}
       </div>
@@ -182,10 +182,20 @@ function CommentCard({ comment, rank }: { comment: any; rank: number }) {
               {comment.likes_count}
             </Text>
           </div>
+          {comment.reply_count > 0 && (
+            <Text style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              {comment.reply_count} 回复
+            </Text>
+          )}
+          {comment.retweet_count > 0 && (
+            <Text style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              {comment.retweet_count} 转发
+            </Text>
+          )}
         </div>
         <Text style={{
           color: 'var(--text-secondary)', fontSize: 13, lineHeight: '20px',
-          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          display: '-webkit-box', WebkitLineClamp: compact ? 2 : 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
           {comment.comment_text}
         </Text>
@@ -200,6 +210,8 @@ export default function MonitorDetailPage() {
   const [selectedResult, setSelectedResult] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined)
+  const [fetchingUrls, setFetchingUrls] = useState<Record<string, boolean>>({})
+  const [cooldownUrls, setCooldownUrls] = useState<Record<string, number>>({})
 
   const fetchResults = () => {
     if (!id) return
@@ -213,10 +225,44 @@ export default function MonitorDetailPage() {
 
   useEffect(() => { fetchResults() }, [id, type, statusFilter])
 
+  // 列表轮询：存在「进行中」记录时每 3s 刷新，任务完成后自动更新
+  useEffect(() => {
+    const hasPending = results.some((r: any) => r.status === 'pending')
+    if (!hasPending) return
+    const timer = setInterval(fetchResults, 3000)
+    return () => clearInterval(timer)
+  }, [results])
+
   const loadDetail = async (resultId: number) => {
     const res = await resultsAPI.detail(resultId)
     setSelectedResult(res.data)
   }
+
+  // 点击「获取评论」：抓取 + 存库 + 触发后台 AI 精选；成功后刷新详情
+  const handleFetchComments = async (resultId: number, postUrl: string) => {
+    setFetchingUrls(prev => ({ ...prev, [postUrl]: true }))
+    try {
+      await resultsAPI.fetchComments(resultId, postUrl)
+      message.success('评论获取成功')
+      setCooldownUrls(prev => ({ ...prev, [postUrl]: Date.now() + 5000 }))
+      await loadDetail(resultId)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '评论获取失败')
+    } finally {
+      setFetchingUrls(prev => ({ ...prev, [postUrl]: false }))
+    }
+  }
+
+  // AI 精选状态轮询：selecting 时每 3s 刷新详情，直到 done
+  useEffect(() => {
+    if (!selectedResult || selectedResult.comments_ai_status !== 'selecting') return
+    const timer = setInterval(async () => {
+      const res = await resultsAPI.detail(selectedResult.id)
+      setSelectedResult(res.data)
+      if (res.data.comments_ai_status === 'done') clearInterval(timer)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [selectedResult?.id, selectedResult?.comments_ai_status])
 
   const handleDelete = async (resultId: number) => {
     try {
@@ -461,6 +507,60 @@ export default function MonitorDetailPage() {
                             查看原文
                           </a>
                         )}
+
+                        {/* 帖子图片 */}
+                        {post.images && post.images.length > 0 && (
+                          <div style={{ marginTop: 12 }}>
+                            <Image.PreviewGroup>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                {post.images.slice(0, 9).map((url: string, imgIdx: number) => (
+                                  <Image
+                                    key={imgIdx}
+                                    src={url}
+                                    width={96}
+                                    height={96}
+                                    style={{ objectFit: 'cover', borderRadius: 10 }}
+                                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                  />
+                                ))}
+                              </div>
+                            </Image.PreviewGroup>
+                          </div>
+                        )}
+
+                        {/* 获取评论按钮 */}
+                        {post.url && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                            <Button
+                              size="small"
+                              icon={fetchingUrls[post.url] ? <LoadingOutlined /> : <CommentOutlined />}
+                              onClick={() => handleFetchComments(selectedResult.id, post.url)}
+                              disabled={!!fetchingUrls[post.url] || Date.now() < (cooldownUrls[post.url] || 0)}
+                            >
+                              {fetchingUrls[post.url] ? '获取中...' : (Date.now() < (cooldownUrls[post.url] || 0) ? '冷却中' : '获取评论')}
+                            </Button>
+                            {(selectedResult.hot_comments || []).some((c: any) => c.post_url === post.url) && (
+                              <Text style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                                {(selectedResult.hot_comments || []).filter((c: any) => c.post_url === post.url).length} 条评论
+                              </Text>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 帖内热门评论 TOP10 */}
+                        {(selectedResult.hot_comments || []).filter((c: any) => c.post_url === post.url).length > 0 && (
+                          <div style={{ marginTop: 14 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {(selectedResult.hot_comments || [])
+                                .filter((c: any) => c.post_url === post.url)
+                                .sort((a: any, b: any) => a.rank - b.rank)
+                                .slice(0, 10)
+                                .map((comment: any) => (
+                                  <CommentCard key={comment.id} comment={comment} rank={comment.rank} compact />
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -504,90 +604,74 @@ export default function MonitorDetailPage() {
             </div>
           )}
 
-          {/* Images */}
-          {selectedResult.raw_content && (() => {
-            try {
-              const posts = JSON.parse(selectedResult.raw_content)
-              const allImages = posts.flatMap((p: any) => p.images || [])
-              if (allImages.length === 0) return null
-              return (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    marginBottom: 12,
+          {/* Hot Comments (global TOP10) */}
+          {(() => {
+            const all = (selectedResult.hot_comments || []) as any[]
+            const global = all.filter((c: any) => c.global_rank > 0).sort((a: any, b: any) => a.global_rank - b.global_rank)
+            const empty = all.length === 0
+            return (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  marginBottom: 12,
+                }}>
+                  <HeartOutlined style={{ color: '#2d6a4f', fontSize: 13 }} />
+                  <Text style={{
+                    color: 'var(--accent)', fontSize: 11, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: 1.5,
+                    fontFamily: 'var(--font-body)',
                   }}>
-                    <PictureOutlined style={{ color: 'var(--accent)', fontSize: 13 }} />
-                    <Text style={{
-                      color: 'var(--accent)', fontSize: 11, fontWeight: 700,
-                      textTransform: 'uppercase', letterSpacing: 1.5,
-                      fontFamily: 'var(--font-body)',
-                    }}>
-                      相关图片
-                    </Text>
+                    热门评论
+                  </Text>
+                  {!empty && global.length > 0 && (
                     <Tag style={{
                       background: 'var(--surface-1)', color: 'var(--text-muted)',
                       border: '1px solid var(--border)', borderRadius: 10, padding: '0 8px',
                       fontSize: 11,
                     }}>
-                      {allImages.length}
+                      TOP {Math.min(global.length, 10)}
                     </Tag>
-                  </div>
+                  )}
+                  {!empty && selectedResult.comments_ai_status === 'selecting' && (
+                    <Tag color="processing" style={{ fontSize: 11, borderRadius: 10 }}>
+                      <LoadingOutlined /> AI 精选中...
+                    </Tag>
+                  )}
+                </div>
+                {empty ? (
                   <div style={{
-                    padding: '16px 20px',
+                    padding: '20px 24px',
                     background: 'var(--surface-0, #fff)',
                     borderRadius: 14,
-                    border: '1px solid var(--border)',
+                    border: '1px dashed var(--border)',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: 13,
                   }}>
-                    <Image.PreviewGroup>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {allImages.slice(0, 20).map((url: string, i: number) => (
-                          <Image
-                            key={i}
-                            src={url}
-                            width={110}
-                            height={110}
-                            style={{ objectFit: 'cover', borderRadius: 10 }}
-                            fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
-                          />
-                        ))}
-                      </div>
-                    </Image.PreviewGroup>
+                    暂无评论，点击帖子下方的「获取评论」按钮抓取
                   </div>
-                </div>
-              )
-            } catch { return null }
+                ) : global.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {global.slice(0, 10).map((comment: any, i: number) => (
+                      <CommentCard key={comment.id} comment={comment} rank={comment.global_rank} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '20px 24px',
+                    background: 'var(--surface-0, #fff)',
+                    borderRadius: 14,
+                    border: '1px dashed var(--border)',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: 13,
+                  }}>
+                    AI 精选进行中，稍后自动更新...
+                  </div>
+                )}
+              </div>
+            )
           })()}
-
-          {/* Hot Comments */}
-          {selectedResult.hot_comments?.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                marginBottom: 12,
-              }}>
-                <HeartOutlined style={{ color: '#2d6a4f', fontSize: 13 }} />
-                <Text style={{
-                  color: 'var(--accent)', fontSize: 11, fontWeight: 700,
-                  textTransform: 'uppercase', letterSpacing: 1.5,
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  热门评论
-                </Text>
-                <Tag style={{
-                  background: 'var(--surface-1)', color: 'var(--text-muted)',
-                  border: '1px solid var(--border)', borderRadius: 10, padding: '0 8px',
-                  fontSize: 11,
-                }}>
-                  TOP {Math.min(selectedResult.hot_comments.length, 10)}
-                </Tag>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {selectedResult.hot_comments.slice(0, 10).map((comment: any, i: number) => (
-                  <CommentCard key={comment.id || i} comment={comment} rank={i + 1} />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Error message */}
           {selectedResult.error_message && (

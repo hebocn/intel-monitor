@@ -204,8 +204,13 @@ class WeiboCrawler(PlaywrightCrawler):
                 text = self._clean_html(c.get("text", ""))
                 author = c.get("user", {}).get("screen_name", "Unknown")
                 likes = c.get("like_count", 0)
+                # 评论底下的回复数（hotflow 的 reply_comment 内嵌 total_number）
+                reply_count = 0
+                reply_comment = c.get("reply_comment") or {}
+                if isinstance(reply_comment, dict):
+                    reply_count = int(reply_comment.get("total_number", 0) or 0)
                 if text:
-                    comments.append(CommentData(text=text, author=author, likes=likes))
+                    comments.append(CommentData(text=text, author=author, likes=likes, reply_count=reply_count))
 
             comments.sort(key=lambda c: c.likes, reverse=True)
             return comments[:10]

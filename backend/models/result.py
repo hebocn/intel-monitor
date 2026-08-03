@@ -23,6 +23,7 @@ class MonitorResult(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")  # success/failed/pending
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     crawl_method: Mapped[str | None] = mapped_column(String(20), nullable=True)  # opencli/cdp/playwright
+    comments_ai_status: Mapped[str] = mapped_column(String(20), default="idle")  # idle/selecting/done
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     hot_comments = relationship("HotComment", backref="monitor_result", lazy="selectin")

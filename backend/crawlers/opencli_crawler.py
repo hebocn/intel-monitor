@@ -300,6 +300,49 @@ async def _run_opencli(platform: str, username_or_query: str, limit: int = 10, i
     raise OpenCLIError(last_error or "OpenCLI 失败")
 
 
+async def _run_opencli_thread(tweet_id: str) -> list:
+    """运行 opencli twitter thread <tweet-id> 并返回 JSON（原帖 + 全部回复）。
+
+    复用 Chrome 登录态（Browser Bridge），失败时抛出 OpenCLIError。
+    """
+    import subprocess as _sp
+
+    opencli_path = shutil.which("opencli")
+    if not opencli_path:
+        raise OpenCLIError("opencli 命令未找到")
+
+    args = ["twitter", "thread", tweet_id, "--format", "json"]
+
+    def _run_subprocess():
+        try:
+            result = _sp.run(
+                [opencli_path] + args,
+                capture_output=True,
+                timeout=120,
+            )
+            return result.stdout, result.stderr, result.returncode
+        except _sp.TimeoutExpired:
+            raise OpenCLIError("OpenCLI thread 执行超时")
+        except Exception as e:
+            raise OpenCLIError(str(e) or type(e).__name__)
+
+    stdout, stderr, returncode = await asyncio.to_thread(_run_subprocess)
+    raw = stdout.decode("utf-8", errors="ignore").strip()
+    err = stderr.decode("utf-8", errors="ignore").strip()
+
+    if returncode != 0:
+        raise OpenCLIError(f"OpenCLI thread 返回非零退出码 ({returncode}): {err[:200]}")
+
+    start = raw.find("[")
+    if start < 0:
+        start = raw.find("{")
+    if start < 0:
+        raise OpenCLIError("OpenCLI thread 返回数据中未找到 JSON")
+
+    data = json.loads(raw[start:])
+    return data if isinstance(data, list) else []
+
+
 class OpenCLICrawler(PlaywrightCrawler):
 
     def __init__(self, platform: str = ""):
@@ -334,7 +377,49 @@ class OpenCLICrawler(PlaywrightCrawler):
             return CrawlResult(success=False, error_message=f"OpenCLI 爬取失败: {str(e) or type(e).__name__}")
 
     async def get_hot_comments(self, post_url: str) -> list[CommentData]:
-        return []
+        """通过 opencli twitter thread 抓取帖文回复（评论）。
+
+        复用 Chrome 登录态，返回原帖的所有回复（带 likes/retweets）。
+        非 twitter 平台或无帖文 ID 时返回空列表。
+        """
+        if self.platform != "x":
+            return []
+        m = re.search(r'/status/(\d+)', post_url)
+        if not m:
+            return []
+        tweet_id = m.group(1)
+
+        try:
+            data = await _run_opencli_thread(tweet_id)
+            if not isinstance(data, list):
+                return []
+
+            comments = []
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                text = item.get("text", "") or ""
+                # 第一条是原帖（无 in_reply_to），跳过；只保留该帖的直接回复
+                if not item.get("in_reply_to"):
+                    continue
+                if not text:
+                    continue
+                comments.append(CommentData(
+                    text=text,
+                    author=item.get("author", "Unknown"),
+                    likes=int(item.get("likes", 0) or 0),
+                    retweet_count=int(item.get("retweets", 0) or 0),
+                    url=item.get("url", ""),
+                ))
+
+            comments.sort(key=lambda c: c.likes + c.retweet_count * 2, reverse=True)
+            return comments[:10]
+        except OpenCLIError as e:
+            logger.warning(f"[OpenCLI] 抓取帖文评论失败: {post_url} ({e})")
+            return []
+        except Exception as e:
+            logger.warning(f"[OpenCLI] 抓取帖文评论异常: {post_url} ({type(e).__name__}: {e})")
+            return []
 
 
 async def crawl_with_opencli(platform: str, account_name: str, account_url: str, limit: int = 10) -> CrawlResult:
