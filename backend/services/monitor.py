@@ -133,16 +133,22 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
                             pass
 
         # OpenCLI 方式：X 平台通过 opencli twitter thread 复用登录态抓取评论
+        # 只对热度最高的前 5 帖抓评论 + 帖间限速，避免触发 Twitter 会话限流 (429)
         elif method == "opencli" and target.platform == "x":
             opencli_crawler = OpenCLICrawler(platform="x")
-            for post in crawl_result.posts:
-                if post.url:
-                    try:
-                        comments = await opencli_crawler.get_hot_comments(post.url)
-                        post.comments = comments
-                        all_comments.extend(comments)
-                    except Exception:
-                        pass
+            top_posts = sorted(
+                [p for p in crawl_result.posts if p.url],
+                key=lambda p: p.likes + p.comments_count * 2,
+                reverse=True,
+            )[:5]
+            for post in top_posts:
+                try:
+                    comments = await opencli_crawler.get_hot_comments(post.url)
+                    post.comments = comments
+                    all_comments.extend(comments)
+                    await asyncio.sleep(3)
+                except Exception:
+                    pass
 
         # 图片提取统计
         img_count = sum(len(p.images) for p in crawl_result.posts)
