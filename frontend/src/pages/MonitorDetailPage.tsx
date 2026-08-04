@@ -212,6 +212,14 @@ export default function MonitorDetailPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined)
   const [fetchingUrls, setFetchingUrls] = useState<Record<string, boolean>>({})
   const [cooldownUrls, setCooldownUrls] = useState<Record<string, number>>({})
+  const [, setTick] = useState(0) // 强制每秒重渲染，让冷却计时器过期
+
+  // 冷却计时器：每秒触发重渲染，让 Date.now() 与 cooldown 截止时间比较生效
+  useEffect(() => {
+    if (Object.keys(cooldownUrls).length === 0) return
+    const timer = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(timer)
+  }, [cooldownUrls])
 
   const fetchResults = () => {
     if (!id) return
