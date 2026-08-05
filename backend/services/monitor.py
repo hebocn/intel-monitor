@@ -14,7 +14,7 @@ from models.target import Target
 from models.website import WebsiteTarget
 from models.result import MonitorResult
 from models.comment import HotComment
-from crawlers import CRAWLER_MAP, WebsiteCrawler, get_router
+from crawlers import CRAWLER_MAP, WebsiteCrawler, OpenCLICrawler, get_router
 from crawlers.base import filter_posts, _run_crawler_in_thread
 from services.summarizer import summarizer
 
@@ -248,8 +248,13 @@ async def fetch_post_comments(monitor_result_id: int, post_url: str) -> dict:
         await db.commit()
 
         try:
-            crawler = crawler_cls()
-            comments = await _run_crawler_in_thread(crawler.get_hot_comments(post_url))
+            # X 平台通过 OpenCLI 复用登录态抓取评论（Playwright 无登录态会返回 0 条）
+            if target.platform == "x":
+                opencli_crawler = OpenCLICrawler(platform="x")
+                comments = await opencli_crawler.get_hot_comments(post_url)
+            else:
+                crawler = crawler_cls()
+                comments = await _run_crawler_in_thread(crawler.get_hot_comments(post_url))
         except Exception as e:
             monitor_result.comments_ai_status = "idle"
             await db.commit()
