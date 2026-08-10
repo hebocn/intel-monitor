@@ -4,6 +4,7 @@ import logging
 import subprocess
 from dataclasses import dataclass, field
 from functools import partial
+from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
@@ -108,10 +109,19 @@ def _normalize_topics(platform: str, raw_items: list[dict]) -> list[TopicItem]:
     return topics
 
 
+# opencli installed via npm global; ensure its bin dir is on PATH for subprocess
+import os as _os
+_OPENCLI_CMD = "opencli.cmd" if _os.name == "nt" else "opencli"
+
 def _run_autocli_sync(site: str, command: str, limit: int) -> tuple[int, str, str]:
-    """Run autocli synchronously. Returns (returncode, stdout, stderr)."""
-    cmd = ["autocli", site, command, "--format", "json", "--limit", str(limit)]
-    proc = subprocess.run(cmd, capture_output=True, timeout=90)
+    """Run opencli synchronously. Returns (returncode, stdout, stderr)."""
+    cmd = [_OPENCLI_CMD, site, command, "--format", "json", "--limit", str(limit)]
+    env = dict(_os.environ)
+    # Add npm global bin in case it's not already in PATH (Windows)
+    npm_bin = str(Path.home() / "AppData" / "Roaming" / "npm")
+    if _os.name == "nt" and npm_bin not in env.get("PATH", ""):
+        env["PATH"] = npm_bin + ";" + env.get("PATH", "")
+    proc = subprocess.run(cmd, capture_output=True, timeout=90, env=env)
     stdout = proc.stdout.decode("utf-8", errors="replace")
     stderr = proc.stderr.decode("utf-8", errors="replace")
     return proc.returncode, stdout, stderr
@@ -236,6 +246,128 @@ async def _fetch_weibo_hot_via_playwright(limit: int = 30) -> list[TopicItem]:
     return await _run_crawler_in_thread(_do_fetch())
 
 
+async def _fetch_twitter_trending_via_playwright(limit: int = 30) -> list[TopicItem]:
+    """Fallback: fetch X/Twitter Trending via Playwright.
+
+    Visits x.com/explore/tabs/trending with the same persistent profile used by
+    crawlers/x_search_playwright.py, so an existing X login session is reused.
+    The trending list is also visible while logged out.
+    """
+    from playwright.async_api import async_playwright
+    from crawlers.base import _run_crawler_in_thread
+
+    async def _do_fetch():
+        # Same profile dir convention as crawlers/x_search_playwright.py,
+        # with a CWD-independent fallback.
+        user_data_dir = Path("backend/data/x_profile")
+        if not user_data_dir.exists():
+            user_data_dir = Path("data/x_profile")
+        user_data_dir.mkdir(parents=True, exist_ok=True)
+
+        pw = await async_playwright().start()
+        context = await pw.chromium.launch_persistent_context(
+            user_data_dir=str(user_data_dir),
+            headless=True,
+            args=["--no-sandbox"],
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/130.0.0.0 Safari/537.36"
+            ),
+        )
+        try:
+            page = await context.new_page()
+            await page.goto(
+                "https://x.com/explore/tabs/trending",
+                wait_until="domcontentloaded",
+                timeout=45000,
+            )
+            # Dismiss the login sheet if it appears (logged-out users)
+            try:
+                close_btn = page.locator('[data-testid="sheetDialog"] button[aria-label="Close"]')
+                if await close_btn.count():
+                    await close_btn.first.click()
+            except Exception:
+                pass
+
+            # Wait for trend items to render
+            try:
+                await page.wait_for_selector('[data-testid="trend"]', timeout=20000)
+            except Exception:
+                # Trends did not render — likely a login wall (X requires login
+                # to view trends since 2023). Detect after the page settled and
+                # report clearly instead of a generic empty result.
+                cookies = await context.cookies("https://x.com")
+                has_auth = any(c["name"] == "auth_token" for c in cookies)
+                body_text = await page.evaluate(
+                    "() => document.body ? document.body.innerText.slice(0, 400) : ''"
+                )
+                if not has_auth and ("See what's happening" in body_text or "Continue with" in body_text):
+                    raise RuntimeError(
+                        "X 热门榜单需要登录。请先打开 x.com 登录一次"
+                        "(登录态将保存到 backend/data/x_profile),之后重新抓取。"
+                    )
+                await page.wait_for_timeout(3000)
+
+            # Scroll to trigger lazy rendering of more trends
+            for _ in range(4):
+                await page.mouse.wheel(0, 1200)
+                await page.wait_for_timeout(800)
+
+            trends = await page.evaluate("""() => {
+                const items = document.querySelectorAll('[data-testid="trend"]');
+                const out = [];
+                for (const el of items) {
+                    const lines = [];
+                    for (const span of el.querySelectorAll('span')) {
+                        const t = span.textContent.trim();
+                        if (t && !lines.includes(t)) lines.push(t);
+                    }
+                    const link = el.querySelector('a[href*="/search?q="]');
+                    const title = lines.find(l => !/posts|trending|trend/i.test(l)) || lines[1] || lines[0] || '';
+                    if (!title) continue;
+                    const category = lines[0] && lines[0] !== title ? lines[0] : '';
+                    const hot = lines.find(l => /posts/i.test(l)) || '';
+                    out.push({
+                        title: title,
+                        url: link ? 'https://x.com' + link.getAttribute('href') : '',
+                        category: category,
+                        hot_value: hot,
+                    });
+                }
+                return out;
+            }""")
+
+            topics = []
+            seen = set()
+            for t in trends:
+                title = str(t.get("title", "")).strip()
+                if not title or title in seen:
+                    continue
+                seen.add(title)
+                extra = {}
+                if t.get("category"):
+                    extra["category"] = t["category"]
+                topics.append(TopicItem(
+                    title=title,
+                    url=str(t.get("url", "")),
+                    rank=len(topics) + 1,
+                    hot_value=str(t.get("hot_value", "")),
+                    extra=extra,
+                ))
+                if len(topics) >= limit:
+                    break
+
+            if not topics:
+                raise RuntimeError("X Trending 页面未提取到话题(可能被登录墙拦截)")
+            return topics
+        finally:
+            await context.close()
+            await pw.stop()
+
+    return await _run_crawler_in_thread(_do_fetch())
+
+
 async def fetch_hot_topics(platform: str, limit: int = 30) -> list[TopicItem]:
     """Fetch hot topics for a single platform."""
     if platform not in PLATFORM_CMD:
@@ -274,6 +406,10 @@ async def fetch_hot_topics(platform: str, limit: int = 30) -> list[TopicItem]:
                         topics = await _fetch_weibo_hot_via_playwright(limit)
                         logger.info(f"[Playwright] {platform}: got {len(topics)} topics via fallback")
                         return topics
+                    if platform == "twitter":
+                        topics = await _fetch_twitter_trending_via_playwright(limit)
+                        logger.info(f"[Playwright] {platform}: got {len(topics)} topics via fallback")
+                        return topics
                 except Exception as pw_err:
                     logger.error(f"[Playwright] {platform} fallback also failed: {pw_err}")
 
@@ -306,6 +442,10 @@ async def fetch_hot_topics(platform: str, limit: int = 30) -> list[TopicItem]:
             try:
                 if platform == "weibo":
                     topics = await _fetch_weibo_hot_via_playwright(limit)
+                    logger.info(f"[Playwright] {platform}: got {len(topics)} topics via fallback")
+                    return topics
+                if platform == "twitter":
+                    topics = await _fetch_twitter_trending_via_playwright(limit)
                     logger.info(f"[Playwright] {platform}: got {len(topics)} topics via fallback")
                     return topics
             except Exception as pw_err:

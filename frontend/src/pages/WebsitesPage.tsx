@@ -87,8 +87,8 @@ function WebsiteCard({
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '3px 12px', borderRadius: 12,
-            background: site.is_active ? 'rgba(82,183,136,0.08)' : 'rgba(140,140,140,0.08)',
-            color: site.is_active ? '#52b788' : '#8c8c8c',
+            background: site.is_active ? 'rgba(34,197,94,0.08)' : 'rgba(140,140,140,0.08)',
+            color: site.is_active ? '#22C55E' : '#8c8c8c',
             fontSize: 12, fontWeight: 600,
           }}>
             {site.is_active ? <CheckCircleOutlined /> : <PauseCircleOutlined />}
@@ -103,7 +103,7 @@ function WebsiteCard({
               icon={<PlayCircleOutlined />}
               onClick={onRun}
               loading={running}
-              style={{ color: '#2d6a4f' }}
+              style={{ color: '#0f766e' }}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -150,8 +150,8 @@ function WebsiteCard({
               <CodeOutlined style={{ color: 'var(--text-muted)', fontSize: 12 }} />
               <Tag style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
-                background: 'rgba(45,106,79,0.06)', color: '#2d6a4f',
-                border: '1px solid rgba(45,106,79,0.12)',
+                background: 'rgba(15,118,110,0.06)', color: '#0f766e',
+                border: '1px solid rgba(15,118,110,0.12)',
                 borderRadius: 8, padding: '1px 8px', margin: 0,
               }}>
                 {site.css_selector}
@@ -174,8 +174,8 @@ function WebsiteCard({
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '3px 12px', borderRadius: 12,
-              background: 'rgba(45,106,79,0.08)',
-              color: '#2d6a4f', fontSize: 12, fontWeight: 600,
+              background: 'rgba(15,118,110,0.08)',
+              color: '#0f766e', fontSize: 12, fontWeight: 600,
             }}>
               <ClockCircleOutlined spin />
               执行中...
@@ -300,7 +300,7 @@ export default function WebsitesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} style={{
-              background: '#fff', borderRadius: 16, border: '1px solid var(--border)', padding: '22px',
+              background: 'var(--surface-2)', borderRadius: 16, border: '1px solid var(--border)', padding: '22px',
             }}>
               <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                 <Skeleton.Input active style={{ width: 60, height: 26, borderRadius: 12 }} />

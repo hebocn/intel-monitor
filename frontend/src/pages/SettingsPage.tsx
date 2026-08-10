@@ -10,14 +10,14 @@ import { scheduleAPI, settingsAPI } from '../services/api'
 const { Text } = Typography
 
 const aiProviders = [
-  { key: 'minimax', label: 'MiniMax', color: '#7c3aed', desc: 'MiniMax-M2.7 · 多模态' },
-  { key: 'deepseek', label: 'DeepSeek', color: '#2563eb', desc: 'deepseek-chat · 推理能力强' },
+  { key: 'minimax', label: 'MiniMax', color: '#A78BFA', desc: 'MiniMax-M2.7 · 多模态' },
+  { key: 'deepseek', label: 'DeepSeek', color: '#3B82F6', desc: 'deepseek-chat · 推理能力强' },
   { key: 'mimo', label: 'MiMo', color: '#e11d48', desc: 'MiMo-V2.5-Pro · 小米大模型' },
 ]
 
 // Service providers — API key only, not LLM models
 const serviceProviders = [
-  { key: 'firecrawl', label: 'Firecrawl', color: '#d97706', desc: 'Web 搜索 + 全文抓取 · 开源情报核心引擎' },
+  { key: 'firecrawl', label: 'Firecrawl', color: '#F59E0B', desc: 'Web 搜索 + 全文抓取 · 开源情报核心引擎' },
   { key: 'tavily', label: 'Tavily', color: '#0891b2', desc: 'AI 驱动 Web 搜索 · 深度内容提取' },
   { key: 'youtube', label: 'YouTube', color: '#FF0000', desc: 'YouTube Data API v3 · 关键词搜索 + 视频元数据' },
   { key: 'google_cse', label: 'Google CSE', color: '#4285F4', desc: 'Facebook 搜索 · Google 自定义搜索引擎 ID' },
@@ -140,8 +140,8 @@ function ProviderCard({
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '2px 10px', borderRadius: 10,
-              background: 'rgba(82,183,136,0.08)',
-              color: '#52b788', fontSize: 11, fontWeight: 600,
+              background: 'rgba(34,197,94,0.08)',
+              color: '#22C55E', fontSize: 11, fontWeight: 600,
             }}>
               <CheckCircleOutlined />
               已配置
@@ -273,7 +273,7 @@ function ProviderCard({
             }
             description={
               <div>
-                <Text style={{ color: state.testResult.success ? '#52b788' : '#c75050', fontSize: 14 }}>
+                <Text style={{ color: state.testResult.success ? '#22C55E' : '#c75050', fontSize: 14 }}>
                   {state.testResult.message}
                 </Text>
                 {state.testResult.reply && (
@@ -287,8 +287,8 @@ function ProviderCard({
               </div>
             }
             style={{
-              background: state.testResult.success ? 'rgba(82,183,136,0.04)' : 'rgba(199,80,80,0.04)',
-              border: `1px solid ${state.testResult.success ? 'rgba(82,183,136,0.12)' : 'rgba(199,80,80,0.12)'}`,
+              background: state.testResult.success ? 'rgba(34,197,94,0.04)' : 'rgba(199,80,80,0.04)',
+              border: `1px solid ${state.testResult.success ? 'rgba(34,197,94,0.12)' : 'rgba(199,80,80,0.12)'}`,
               borderRadius: 12,
             }}
           />
@@ -443,7 +443,7 @@ export default function SettingsPage() {
         }}>
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #2d6a4f, #2d6a4f88)',
+            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
             borderRadius: '4px 0 0 4px',
           }} />
           <div style={{
@@ -454,11 +454,11 @@ export default function SettingsPage() {
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 14px 5px 10px',
               borderRadius: 20,
-              background: 'rgba(45,106,79,0.08)',
-              border: '1px solid rgba(45,106,79,0.15)',
+              background: 'rgba(15,118,110,0.08)',
+              border: '1px solid rgba(15,118,110,0.15)',
             }}>
-              <StarFilled style={{ color: '#2d6a4f', fontSize: 12 }} />
-              <Text style={{ color: '#2d6a4f', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
+              <StarFilled style={{ color: '#0f766e', fontSize: 12 }} />
+              <Text style={{ color: '#0f766e', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
                 默认 AI 模型
               </Text>
             </div>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
         }}>
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #2d6a4f, #2d6a4f88)',
+            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
             borderRadius: '4px 0 0 4px',
           }} />
           <div style={{
@@ -545,11 +545,11 @@ export default function SettingsPage() {
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '5px 14px 5px 10px',
                 borderRadius: 20,
-                background: 'rgba(45,106,79,0.08)',
-                border: '1px solid rgba(45,106,79,0.15)',
+                background: 'rgba(15,118,110,0.08)',
+                border: '1px solid rgba(15,118,110,0.15)',
               }}>
                 <span style={{ fontSize: 13 }}>📝</span>
-                <Text style={{ color: '#2d6a4f', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
+                <Text style={{ color: '#0f766e', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
                   AI 分析提示词
                 </Text>
               </div>
@@ -658,7 +658,7 @@ export default function SettingsPage() {
         }}>
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #2d6a4f, #2d6a4f88)',
+            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
             borderRadius: '4px 0 0 4px',
           }} />
 
@@ -672,11 +672,11 @@ export default function SettingsPage() {
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '5px 14px 5px 10px',
                 borderRadius: 20,
-                background: 'rgba(45,106,79,0.08)',
-                border: '1px solid rgba(45,106,79,0.15)',
+                background: 'rgba(15,118,110,0.08)',
+                border: '1px solid rgba(15,118,110,0.15)',
               }}>
-                <ScheduleOutlined style={{ color: '#2d6a4f', fontSize: 12 }} />
-                <Text style={{ color: '#2d6a4f', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
+                <ScheduleOutlined style={{ color: '#0f766e', fontSize: 12 }} />
+                <Text style={{ color: '#0f766e', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
                   调度任务
                 </Text>
               </div>
@@ -734,11 +734,11 @@ export default function SettingsPage() {
                         <div style={{
                           display: 'inline-flex', alignItems: 'center', gap: 6,
                           padding: '2px 10px', borderRadius: 8,
-                          background: 'rgba(45,106,79,0.06)',
-                          border: '1px solid rgba(45,106,79,0.1)',
+                          background: 'rgba(15,118,110,0.06)',
+                          border: '1px solid rgba(15,118,110,0.1)',
                         }}>
-                          <ClockCircleOutlined style={{ color: '#2d6a4f', fontSize: 11 }} />
-                          <Text style={{ color: '#2d6a4f', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>
+                          <ClockCircleOutlined style={{ color: '#0f766e', fontSize: 11 }} />
+                          <Text style={{ color: '#0f766e', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600 }}>
                             {job.trigger}
                           </Text>
                         </div>

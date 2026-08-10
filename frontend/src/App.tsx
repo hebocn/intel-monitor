@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import LoginPage from './pages/LoginPage'
 import AppLayout from './components/AppLayout'
-import DashboardPage from './pages/DashboardPage'
+// DashboardPage 暂时隐藏，保留代码
+// import DashboardPage from './pages/DashboardPage'
 import SocialAccountsPage from './pages/SocialAccountsPage'
 import WebsitesPage from './pages/WebsitesPage'
 import MonitorDetailPage from './pages/MonitorDetailPage'
@@ -11,6 +12,8 @@ import HotTopicsPage from './pages/HotTopicsPage'
 import SentimentPage from './pages/SentimentPage'
 import IntelligenceReportPage from './pages/IntelligenceReportPage'
 import AccountMatchPage from './pages/AccountMatchPage'
+import CockpitPage from './pages/CockpitPage'
+import './pages/CockpitPage.css'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -34,7 +37,9 @@ function App() {
           isAuthenticated ? (
             <AppLayout onLogout={() => { localStorage.removeItem('token'); setIsAuthenticated(false) }}>
               <Routes>
-                <Route path="/" element={<DashboardPage />} />
+                {/* DashboardPage 暂时隐藏，/ 重定向到驾驶舱 */}
+                <Route path="/" element={<Navigate to="/cockpit" />} />
+                <Route path="/cockpit" element={<CockpitPage />} />
                 <Route path="/social" element={<SocialAccountsPage />} />
                 <Route path="/websites" element={<WebsitesPage />} />
                 <Route path="/detail/:type/:id" element={<MonitorDetailPage />} />

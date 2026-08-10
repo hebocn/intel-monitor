@@ -3,7 +3,7 @@ import {
   DashboardOutlined, MobileOutlined, GlobalOutlined,
   SettingOutlined, LogoutOutlined, RadarChartOutlined,
   LeftOutlined, RightOutlined, FireOutlined, SearchOutlined,
-  FileTextOutlined, SwapOutlined,
+  FileTextOutlined, SwapOutlined, CodeSandboxOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ReactNode, useState, useEffect, useCallback } from 'react'
@@ -32,7 +32,8 @@ interface Props {
 }
 
 const menuItems = [
-  { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
+  // { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },  // 暂时隐藏，保留代码
+  { key: '/cockpit', icon: <CodeSandboxOutlined />, label: '首页' },
   { key: '/social', icon: <MobileOutlined />, label: '社交账号' },
   { key: '/websites', icon: <GlobalOutlined />, label: '网站监测' },
   { key: '/hot-topics', icon: <FireOutlined />, label: '热门话题' },
@@ -108,6 +109,8 @@ export default function AppLayout({ children, onLogout }: Props) {
   }, [location.pathname])
   const currentLabel = menuItems.find(m => m.key === location.pathname)?.label || '页面'
 
+  const isCockpit = location.pathname === '/cockpit'
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
@@ -116,7 +119,7 @@ export default function AppLayout({ children, onLogout }: Props) {
         collapsed={collapsed}
         trigger={null}
         style={{
-          background: '#1a2e26',
+          background: '#0F172A',
           borderRight: 'none',
           overflow: 'hidden',
           display: 'flex',
@@ -131,7 +134,7 @@ export default function AppLayout({ children, onLogout }: Props) {
         {/* 顶部渐变 */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 200,
-          background: 'linear-gradient(180deg, rgba(45,106,79,0.12) 0%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(34,197,94,0.08) 0%, transparent 100%)',
           pointerEvents: 'none',
         }} />
 
@@ -143,7 +146,7 @@ export default function AppLayout({ children, onLogout }: Props) {
           justifyContent: collapsed ? 'center' : 'flex-start',
           gap: collapsed ? 0 : 16,
           borderBottom: '1px solid transparent',
-          borderImage: 'linear-gradient(to right, rgba(255,255,255,0.06), transparent) 1',
+          borderImage: 'linear-gradient(to right, rgba(34,197,94,0.15), transparent) 1',
           position: 'relative',
         }}>
           {collapsed ? (
@@ -151,10 +154,10 @@ export default function AppLayout({ children, onLogout }: Props) {
               <div style={{
                 width: 48, height: 48, borderRadius: '50%',
                 background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(45,106,79,0.25)',
+                border: '1px solid rgba(34,197,94,0.25)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <RadarChartOutlined style={{ fontSize: 22, color: '#52b788' }} />
+                <RadarChartOutlined style={{ fontSize: 22, color: '#22C55E' }} />
               </div>
             </Tooltip>
           ) : (
@@ -162,11 +165,11 @@ export default function AppLayout({ children, onLogout }: Props) {
               <div style={{
                 width: 48, height: 48, borderRadius: 12,
                 background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(45,106,79,0.25)',
+                border: '1px solid rgba(34,197,94,0.25)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
               }}>
-                <RadarChartOutlined style={{ fontSize: 22, color: '#52b788' }} />
+                <RadarChartOutlined style={{ fontSize: 22, color: '#22C55E' }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <Text strong style={{
@@ -206,7 +209,7 @@ export default function AppLayout({ children, onLogout }: Props) {
                   >
                     <span className="sidebar-nav-icon" style={{
                       fontSize: 22,
-                      color: isActive ? '#52b788' : 'rgba(255,255,255,0.45)',
+                      color: isActive ? '#22C55E' : 'rgba(248,250,252,0.55)',
                     }}>
                       {item.icon}
                     </span>
@@ -221,12 +224,12 @@ export default function AppLayout({ children, onLogout }: Props) {
                 onClick={() => navigate(item.key)}
               >
                 <span className="sidebar-nav-icon" style={{
-                  color: isActive ? '#52b788' : 'rgba(255,255,255,0.45)',
+                  color: isActive ? '#22C55E' : 'rgba(248,250,252,0.55)',
                 }}>
                   {item.icon}
                 </span>
                 <span className="sidebar-nav-label" style={{
-                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.55)',
+                  color: isActive ? '#F8FAFC' : 'rgba(248,250,252,0.65)',
                   fontWeight: isActive ? 600 : 500,
                 }}>
                   {item.label}
@@ -277,7 +280,7 @@ export default function AppLayout({ children, onLogout }: Props) {
                     AI 引擎
                   </Text>
                   <Text style={{
-                    color: 'rgba(82,183,136,0.8)', fontSize: 12,
+                    color: 'rgba(34,197,94,0.8)', fontSize: 12,
                     fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: 1,
                   }}>
                     {aiProviderLabel}
@@ -320,18 +323,18 @@ export default function AppLayout({ children, onLogout }: Props) {
         <Header style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '0 32px',
-          background: 'rgba(255,255,255,0.8)',
+          background: 'rgba(15,23,42,0.8)',
           backdropFilter: 'blur(16px) saturate(180%)',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           height: 64,
           position: 'sticky', top: 0, zIndex: 10,
         }}>
           <div style={{
             padding: '6px 18px',
-            background: 'rgba(45,106,79,0.06)',
-            border: '1px solid rgba(45,106,79,0.12)',
+            background: 'rgba(34,197,94,0.08)',
+            border: '1px solid rgba(34,197,94,0.15)',
             borderRadius: 8,
-            color: '#2d6a4f',
+            color: '#22C55E',
             fontSize: 13, letterSpacing: 2,
             fontFamily: "var(--font-body)", fontWeight: 600,
           }}>
@@ -353,13 +356,15 @@ export default function AppLayout({ children, onLogout }: Props) {
               height: 44, borderRadius: 10,
             }}>
               <Avatar size={36} src={getAvatarUrl(getUsername())} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: 15, fontWeight: 500 }}>{getUsername()}</span>
+              <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{getUsername()}</span>
             </Button>
           </Dropdown>
         </Header>
 
         <Content style={{
-          padding: 32, overflow: 'auto', background: 'var(--bg)',
+          padding: isCockpit ? 0 : 32, overflow: 'auto',
+          background: '#0B1120',
+          minHeight: '100vh',
         }}>
           {children}
         </Content>

@@ -34,11 +34,11 @@ interface SentimentTask {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
-const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#2563eb', youtube: '#FF0000', x: '#000000', facebook: '#1877F2' }
+const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', douyin: '#111', xiaohongshu: '#ff2442', toutiao: '#e53333', '108community': '#3B82F6', youtube: '#FF0000', x: '#000000', facebook: '#1877F2' }
 const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', douyin: '抖音', xiaohongshu: '小红书', toutiao: '今日头条', '108community': '108社区', youtube: 'YouTube', x: 'X', facebook: 'Facebook' }
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:   { color: '#f59e0b', icon: <ClockCircleOutlined />,   text: '等待' },
-  running:   { color: '#3b82f6', icon: <SyncOutlined spin />,      text: '搜索中' },
+  running:   { color: '#60A5FA', icon: <SyncOutlined spin />,      text: '搜索中' },
   completed: { color: '#10b981', icon: <CheckCircleOutlined />,    text: '完成' },
   failed:    { color: '#ef4444', icon: <CloseCircleOutlined />,    text: '失败' },
 }
@@ -64,10 +64,10 @@ const fmtDt = (isoString: string | null): string => {
 // ── Sub-Components ───────────────────────────────────────────────────────
 
 function ImpactBadge({ score }: { score: number }) {
-  const palette = score >= 50 ? { bg: '#fef2f2', c: '#dc2626', b: '#fecaca' }
-    : score >= 25 ? { bg: '#fffbeb', c: '#d97706', b: '#fde68a' }
-    : score >= 10 ? { bg: '#eff6ff', c: '#2563eb', b: '#bfdbfe' }
-    :               { bg: '#f8fafc', c: '#94a3b8', b: '#e2e8f0' }
+  const palette = score >= 50 ? { bg: '#1F0A0A', c: '#EF4444', b: '#5C1A1A' }
+    : score >= 25 ? { bg: '#1F1500', c: '#F59E0B', b: '#5C4400' }
+    : score >= 10 ? { bg: '#0C1929', c: '#3B82F6', b: '#1E3A5F' }
+    :               { bg: 'var(--surface-1)', c: 'var(--text-muted)', b: '#1E293B' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -121,7 +121,7 @@ function PostContent({ title, content }: { title: string; content: string }) {
   if (!text) return null
   const limit = 200; const long = text.length > limit
   return (
-    <div style={{ fontSize: 14, lineHeight: 1.8, color: '#334155', wordBreak: 'break-word', marginBottom: 8 }}>
+    <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--text-secondary)', wordBreak: 'break-word', marginBottom: 8 }}>
       {long && !open ? text.slice(0, limit) + '…' : text}
       {long && (
         <a onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
@@ -145,24 +145,24 @@ function PostComments({ commentsJson }: { commentsJson: string | null }) {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', borderRadius: 18,
-            background: open ? '#eff6ff' : '#f8fafc',
-            border: `1px solid ${open ? '#93c5fd' : '#e2e8f0'}`,
-            fontSize: 12, color: open ? '#2563eb' : '#64748b',
+            background: open ? '#0C1929' : 'var(--surface-1)',
+            border: `1px solid ${open ? '#93c5fd' : '#1E293B'}`,
+            fontSize: 12, color: open ? '#3B82F6' : 'var(--text-muted)',
             cursor: 'pointer', userSelect: 'none',
             fontWeight: 500, transition: 'all 0.15s',
           }}>
-          <MessageOutlined />热门评论 <span style={{ fontWeight: 700, color: '#3b82f6' }}>{cmts.length}</span> 条
+          <MessageOutlined />热门评论 <span style={{ fontWeight: 700, color: '#60A5FA' }}>{cmts.length}</span> 条
           {open ? ' ▲' : ' ▼'}
         </div>
         {open && (
           <div style={{ marginTop: 8 }}>
             {cmts.map((c, i) => (
-              <div key={i} style={{ padding: '8px 12px', marginBottom: 4, background: '#f8fafc', borderRadius: 8, fontSize: 13, lineHeight: 1.7 }}>
+              <div key={i} style={{ padding: '8px 12px', marginBottom: 4, background: 'var(--surface-1)', borderRadius: 8, fontSize: 13, lineHeight: 1.7 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontWeight: 600, color: '#334155' }}>{c.author}</span>
-                  {c.likes > 0 && <span style={{ color: '#94a3b8', fontSize: 12 }}><LikeOutlined style={{ fontSize: 10 }} /> {fmt(c.likes)}</span>}
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{c.author}</span>
+                  {c.likes > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}><LikeOutlined style={{ fontSize: 10 }} /> {fmt(c.likes)}</span>}
                 </div>
-                <div style={{ color: '#475569' }}>{c.text}</div>
+                <div style={{ color: 'var(--text-secondary)' }}>{c.text}</div>
               </div>
             ))}
           </div>
@@ -180,19 +180,19 @@ function QuotedTweet({ quotedTweetJson }: { quotedTweetJson: string | null }) {
     return (
       <div style={{
         marginBottom: 10, padding: '10px 14px', borderRadius: 10,
-        borderLeft: `3px solid #1DA1F2`, background: '#f8fafc',
-        fontSize: 13, lineHeight: 1.7, color: '#475569',
+        borderLeft: `3px solid #1DA1F2`, background: 'var(--surface-1)',
+        fontSize: 13, lineHeight: 1.7, color: 'var(--text-secondary)',
       }}>
         <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontWeight: 600, color: '#1e293b' }}>{qt.name || `@${qt.author}`}</span>
-          <span style={{ color: '#94a3b8', fontSize: 11 }}>@{qt.author}</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{qt.name || `@${qt.author}`}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>@{qt.author}</span>
         </div>
         <div style={{ wordBreak: 'break-word' }}>
           {qt.text.length > 200 ? qt.text.slice(0, 200) + '…' : qt.text}
         </div>
         {qt.url && (
           <a href={qt.url} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 11, color: '#3b82f6', display: 'inline-block', marginTop: 4 }}>
+            style={{ fontSize: 11, color: '#60A5FA', display: 'inline-block', marginTop: 4 }}>
             查看引用推文 ↗
           </a>
         )}
@@ -210,16 +210,16 @@ function LinkCard({ cardJson }: { cardJson: string | null }) {
       <a href={card.url || '#'} target="_blank" rel="noopener noreferrer"
         style={{
           display: 'flex', gap: 10, marginBottom: 10, padding: '10px 12px',
-          borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+          borderRadius: 10, border: '1px solid #1E293B', background: 'var(--surface-1)',
           textDecoration: 'none', color: 'inherit', maxWidth: 400,
         }}>
         {card.image_url && (
           <img src={card.image_url} alt="" style={{ width: 60, height: 60, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
         )}
         <div style={{ minWidth: 0 }}>
-          {card.domain && <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{card.domain}</div>}
-          {card.title && <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.title}</div>}
-          {card.description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.description}</div>}
+          {card.domain && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{card.domain}</div>}
+          {card.title && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.title}</div>}
+          {card.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.description}</div>}
         </div>
       </a>
     )
@@ -265,10 +265,10 @@ function DeepAnalysisButton({ post }: { post: SentimentPost }) {
   }, [status, post.id])
 
   const styleMap: Record<string, { bg: string; border: string; color: string; text: string; hint: string }> = {
-    idle: { bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', text: '🎧 深度分析', hint: '下载音频+转录+AI摘要' },
-    processing: { bg: '#eff6ff', border: '#93c5fd', color: '#2563eb', text: '⏳ 分析中...', hint: '下载音频 → 转录 → AI摘要' },
-    completed: { bg: '#f0fdf4', border: '#86efac', color: '#16a34a', text: '✅ 深度分析已完成', hint: '页面刷新后可见' },
-    failed: { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', text: '❌ 深度分析失败', hint: '点击重试' },
+    idle: { bg: 'var(--surface-1)', border: '#1E293B', color: 'var(--text-muted)', text: '🎧 深度分析', hint: '下载音频+转录+AI摘要' },
+    processing: { bg: '#0C1929', border: '#93c5fd', color: '#3B82F6', text: '⏳ 分析中...', hint: '下载音频 → 转录 → AI摘要' },
+    completed: { bg: '#0A1F14', border: '#86efac', color: '#22C55E', text: '✅ 深度分析已完成', hint: '页面刷新后可见' },
+    failed: { bg: '#1F0A0A', border: '#5C1A1A', color: '#EF4444', text: '❌ 深度分析失败', hint: '点击重试' },
   }
   const statusStyle = styleMap[status] || styleMap.idle
 
@@ -289,7 +289,7 @@ function DeepAnalysisButton({ post }: { post: SentimentPost }) {
       >
         {loading && <SyncOutlined spin />}
         <span>{statusStyle.text}</span>
-        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>{statusStyle.hint}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>{statusStyle.hint}</span>
       </button>
     </div>
   )
@@ -303,14 +303,14 @@ function MetricRow({ post }: { post: SentimentPost }) {
     ...(post.bookmarks > 0 ? [{ icon: <StarOutlined />, v: post.bookmarks, label: '收藏' }] : []),
   ]
   return (
-    <div style={{ display: 'flex', gap: 18, fontSize: 12, color: '#64748b' }}>
+    <div style={{ display: 'flex', gap: 18, fontSize: 12, color: 'var(--text-muted)' }}>
       {items.map((m, i) => (
         <Tooltip key={i} title={m.label}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{m.icon} {fmt(m.v)}</span>
         </Tooltip>
       ))}
       <Tooltip title={`互动分:${fmts(post.engagement_score)} · 平台权重:${fmts(post.platform_weight)} · 时间衰减:${fmts(post.time_decay)}`}>
-        <span style={{ color: '#94a3b8', cursor: 'help', fontSize: 11, marginLeft: 'auto' }}>评分详情</span>
+        <span style={{ color: 'var(--text-muted)', cursor: 'help', fontSize: 11, marginLeft: 'auto' }}>评分详情</span>
       </Tooltip>
     </div>
   )
@@ -320,12 +320,12 @@ function KpiCard({ icon, value, label, iconBg, iconColor, valueColor }: {
   icon: React.ReactNode; value: string; label: string; iconBg: string; iconColor: string; valueColor: string
 }) {
   return (
-    <div style={{ flex: '1 1 140px', background: '#fff', borderRadius: R.md, padding: '14px 18px', border: '1px solid #e2e8f0' }}>
+    <div style={{ flex: '1 1 140px', background: 'var(--surface-2)', borderRadius: R.md, padding: '14px 18px', border: '1px solid #1E293B' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, fontSize: 18, flexShrink: 0 }}>{icon}</div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: valueColor, lineHeight: 1.2 }}>{value}</div>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>{label}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>
         </div>
       </div>
     </div>
@@ -333,7 +333,7 @@ function KpiCard({ icon, value, label, iconBg, iconColor, valueColor }: {
 }
 
 function PulsingDot() {
-  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', marginRight: 8, animation: 'pulse2 1.5s infinite' }} />
+  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#60A5FA', marginRight: 8, animation: 'pulse2 1.5s infinite' }} />
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ export default function SentimentPage() {
   useEffect(() => {
     sentimentAPI.listPlatforms().then(res => {
       setPlatforms(res.data)
-      setSelectedPlatforms(res.data.map((p: PlatformInfo) => p.platform))
+      // 不再默认全选，用户按需自行选择平台
     }).catch(() => message.error('加载平台列表失败'))
     fetchTasks()
   }, [])
@@ -449,7 +449,7 @@ export default function SentimentPage() {
       </div>
 
       {/* Search Bar */}
-      <div style={{ background: '#fff', borderRadius: R.xl, padding: '24px 28px', marginBottom: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <div style={{ background: 'var(--surface-2)', borderRadius: R.xl, padding: '24px 28px', marginBottom: 24, border: '1px solid #1E293B', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <Row gutter={[12, 12]}>
           <Col xs={24} md={12}>
             <Input.Search size="large" placeholder="输入关键词，如：人工智能、贸易政策..." value={keyword} onChange={e => setKeyword(e.target.value)}
@@ -471,8 +471,13 @@ export default function SentimentPage() {
             return (
               <Tag.CheckableTag key={p.platform} checked={checked}
                 onChange={c => setSelectedPlatforms(c ? [...selectedPlatforms, p.platform] : selectedPlatforms.filter(x => x !== p.platform))}
-                style={{ borderRadius: 20, padding: '2px 14px', fontSize: 12, fontWeight: 500, border: `1px solid ${checked ? PLATFORM_COLORS[p.platform] : '#e2e8f0'}`,
-                  background: checked ? `${PLATFORM_COLORS[p.platform]}12` : '#fff', color: checked ? PLATFORM_COLORS[p.platform] : '#64748b' }}>
+                style={{
+                  borderRadius: 20, padding: '4px 16px', fontSize: 13, fontWeight: 600,
+                  border: `1.5px solid ${checked ? '#22C55E' : 'rgba(248,250,252,0.1)'}`,
+                  background: checked ? 'rgba(34,197,94,0.12)' : 'rgba(248,250,252,0.03)',
+                  color: checked ? '#22C55E' : 'var(--text-muted)',
+                  transition: 'all 0.2s ease',
+                }}>
                 {p.label}
               </Tag.CheckableTag>
             )
@@ -488,11 +493,11 @@ export default function SentimentPage() {
             }
             content={
               !cdpStatus
-                ? <span style={{ fontSize: 13, color: '#64748b' }}>点击标签检测浏览器驱动状态</span>
+                ? <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>点击标签检测浏览器驱动状态</span>
                 : cdpStatus.chrome_connected
-                ? <span style={{ fontSize: 13, color: '#16a34a' }}>{cdpStatus.message}</span>
+                ? <span style={{ fontSize: 13, color: '#22C55E' }}>{cdpStatus.message}</span>
                 : <div style={{ maxWidth: 340 }}>
-                    <p style={{ fontSize: 13, color: '#475569', marginBottom: 12, fontWeight: 500 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12, fontWeight: 500 }}>
                       {cdpStatus.message}
                     </p>
                     <Button
@@ -502,13 +507,13 @@ export default function SentimentPage() {
                       loading={repairingCDP}
                       onClick={(e) => { e.stopPropagation(); repairCDP() }}
                       style={{
-                        background: '#16a34a', borderColor: '#16a34a',
+                        background: '#22C55E', borderColor: '#22C55E',
                         borderRadius: 6, fontWeight: 500,
                       }}
                     >
                       {repairingCDP ? '修复中...' : '一键修复'}
                     </Button>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
                       将尝试自动启动 CDP Proxy 并唤起 Chrome 远程调试
                     </div>
                   </div>
@@ -517,9 +522,9 @@ export default function SentimentPage() {
             <Tag
               style={{
                 borderRadius: 20, padding: '2px 14px', fontSize: 12, fontWeight: 500,
-                border: `1px solid ${!cdpStatus ? '#e2e8f0' : cdpStatus.chrome_connected ? '#86efac' : '#fecaca'}`,
-                background: !cdpStatus ? '#f8fafc' : cdpStatus.chrome_connected ? '#f0fdf4' : '#fef2f2',
-                color: !cdpStatus ? '#94a3b8' : cdpStatus.chrome_connected ? '#16a34a' : '#dc2626',
+                border: `1px solid ${!cdpStatus ? '#1E293B' : cdpStatus.chrome_connected ? '#86efac' : '#5C1A1A'}`,
+                background: !cdpStatus ? 'var(--surface-1)' : cdpStatus.chrome_connected ? '#0A1F14' : '#1F0A0A',
+                color: !cdpStatus ? 'var(--text-muted)' : cdpStatus.chrome_connected ? '#22C55E' : '#EF4444',
                 cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
               }}
               onClick={checkCDP}
@@ -535,7 +540,7 @@ export default function SentimentPage() {
             </Tag>
           </Popover>
           <Tooltip title="影响力 = 互动得分 × 平台权重 × 时间衰减 × 100">
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#94a3b8', cursor: 'help' }}>评分说明</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)', cursor: 'help' }}>评分说明</span>
           </Tooltip>
         </div>
       </div>
@@ -543,13 +548,13 @@ export default function SentimentPage() {
       <Row gutter={24}>
         {/* Sidebar — History */}
         <Col xs={24} lg={6}>
-          <div style={{ background: '#fff', borderRadius: R.lg, padding: '18px 20px', border: '1px solid #e2e8f0', height: 'calc(100vh - 360px)', overflow: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '18px 20px', border: '1px solid #1E293B', height: 'calc(100vh - 360px)', overflow: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <ClockCircleOutlined />历史搜索
-              {tasks.length > 0 && <span style={{ color: '#94a3b8', fontWeight: 400 }}>({tasks.length})</span>}
+              {tasks.length > 0 && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({tasks.length})</span>}
             </div>
             {loadingTasks ? <Skeleton active paragraph={{ rows: 6 }} /> : !tasks.length ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 12 }}>暂无记录</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 12 }}>暂无记录</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {tasks.map(t => {
@@ -558,15 +563,15 @@ export default function SentimentPage() {
                     <div key={t.id} onClick={() => { stopPolling(); fetchTaskDetail(t.id) }}
                       style={{
                         padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                        background: active ? '#eff6ff' : 'transparent',
-                        border: active ? '1px solid #bfdbfe' : '1px solid transparent',
+                        background: active ? '#0C1929' : 'transparent',
+                        border: active ? '1px solid #1E3A5F' : '1px solid transparent',
                         transition: 'all 0.15s',
                       }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{t.keyword}</span>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{t.keyword}</span>
                         <Badge status={t.status === 'completed' ? 'success' : t.status === 'running' ? 'processing' : t.status === 'failed' ? 'error' : 'default'} />
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
                         <span>{t.total_posts || 0} 条</span>
                         <span>{fmtDt(t.created_at)}</span>
                       </div>
@@ -581,28 +586,28 @@ export default function SentimentPage() {
         {/* Main — Results */}
         <Col xs={24} lg={18}>
           {loadingDetail ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: 24, border: '1px solid #e2e8f0' }}><Skeleton active paragraph={{ rows: 10 }} /></div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: 24, border: '1px solid #1E293B' }}><Skeleton active paragraph={{ rows: 10 }} /></div>
           ) : !selectedTask ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: '80px 20px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f1f5f9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <SearchOutlined style={{ fontSize: 24, color: '#cbd5e1' }} />
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '80px 20px', textAlign: 'center', border: '1px solid #1E293B', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--surface-1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <SearchOutlined style={{ fontSize: 24, color: 'var(--text-secondary)' }} />
               </div>
-              <div style={{ fontSize: 15, color: '#64748b', fontWeight: 500 }}>选择左侧历史搜索查看结果</div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>或在上方输入关键词开始新的搜索</div>
+              <div style={{ fontSize: 15, color: 'var(--text-muted)', fontWeight: 500 }}>选择左侧历史搜索查看结果</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>或在上方输入关键词开始新的搜索</div>
             </div>
           ) : selectedTask.status === 'pending' || selectedTask.status === 'running' ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid #1E293B', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
               <Spin size="large" />
-              <div style={{ marginTop: 16, fontSize: 14, color: '#475569', fontWeight: 600 }}>
+              <div style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)', fontWeight: 600 }}>
                 <PulsingDot />正在搜索 "{selectedTask.keyword}"
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>多平台并发采集 + 影响力计算</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>多平台并发采集 + 影响力计算</div>
             </div>
           ) : selectedTask.status === 'failed' ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: 24, border: '1px solid #fecaca', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: 8 }}>搜索失败</div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: 24, border: '1px solid #5C1A1A', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+              <div style={{ color: '#EF4444', fontWeight: 600, marginBottom: 8 }}>搜索失败</div>
               {selectedTask.error_log && (
-                <pre style={{ fontSize: 11, color: '#7f1d1d', background: '#fef2f2', padding: 12, borderRadius: R.sm, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                <pre style={{ fontSize: 11, color: '#EF4444', background: '#1F0A0A', padding: 12, borderRadius: R.sm, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
                   {JSON.stringify(JSON.parse(selectedTask.error_log), null, 2)}
                 </pre>
               )}
@@ -612,11 +617,11 @@ export default function SentimentPage() {
             <div>
               {/* KPI Row */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                <KpiCard icon={<SearchOutlined />} value={String(selectedTask.total_posts)} label="搜索结果" iconBg="#eff6ff" iconColor="#3b82f6" valueColor="#1e3a8a" />
+                <KpiCard icon={<SearchOutlined />} value={String(selectedTask.total_posts)} label="搜索结果" iconBg="#0C1929" iconColor="#60A5FA" valueColor="#1e3a8a" />
                 <KpiCard icon={<ThunderboltOutlined />} value={selectedTask.posts?.length ? fmts(selectedTask.posts[0].impact_score) : '-'} label="最高影响力" iconBg="#fff7ed" iconColor="#f97316" valueColor="#9a3412" />
-                <KpiCard icon={<BarChartOutlined />} value={(JSON.parse(selectedTask.platforms) as string[]).map((p: string) => PLATFORM_LABELS[p] || p).join('/')} label="已监测" iconBg="#f0fdf4" iconColor="#22c55e" valueColor="#14532d" />
+                <KpiCard icon={<BarChartOutlined />} value={(JSON.parse(selectedTask.platforms) as string[]).map((p: string) => PLATFORM_LABELS[p] || p).join('/')} label="已监测" iconBg="#0A1F14" iconColor="#22c55e" valueColor="#14532d" />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{fmtDt(selectedTask.created_at)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtDt(selectedTask.created_at)}</span>
                   <Button size="small" danger type="text" icon={<DeleteOutlined />} onClick={() => handleDeleteTask(selectedTask.id)} />
                 </div>
               </div>
@@ -630,14 +635,14 @@ export default function SentimentPage() {
                   return (
                     <div style={{
                       marginBottom: 16, padding: '14px 18px',
-                      background: '#fffbeb', borderRadius: R.md,
-                      border: '1px solid #fde68a',
+                      background: '#1F1500', borderRadius: R.md,
+                      border: '1px solid #5C4400',
                     }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B', marginBottom: 8 }}>
                         ⚠️ 部分平台搜索异常
                       </div>
                       {entries.map(([platform, msg]) => (
-                        <div key={platform} style={{ fontSize: 12, color: '#a16207', marginBottom: 4, lineHeight: 1.6 }}>
+                        <div key={platform} style={{ fontSize: 12, color: '#F59E0B', marginBottom: 4, lineHeight: 1.6 }}>
                           <Tag color="gold" style={{ marginRight: 6, fontSize: 11 }}>
                             {PLATFORM_LABELS[platform] || platform}
                           </Tag>
@@ -651,25 +656,25 @@ export default function SentimentPage() {
 
               {/* Post Cards */}
               {selectedTask.posts?.length === 0 ? (
-                <div style={{ background: '#fff', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid #1E293B' }}>
                   <Empty description="未找到相关帖子" />
                 </div>
               ) : (
                 selectedTask.posts?.map((post, idx) => (
                   <div key={post.id}
                     style={{
-                      background: '#fff', borderRadius: R.lg, padding: '18px 22px', marginBottom: 10,
-                      border: '1px solid #e2e8f0', borderLeftWidth: 4,
-                      borderLeftColor: PLATFORM_COLORS[post.platform] || '#3b82f6',
+                      background: 'var(--surface-2)', borderRadius: R.lg, padding: '18px 22px', marginBottom: 10,
+                      border: '1px solid #1E293B', borderLeftWidth: 4,
+                      borderLeftColor: PLATFORM_COLORS[post.platform] || '#60A5FA',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                       transition: 'box-shadow 0.15s, border-color 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; e.currentTarget.style.borderColor = '#bfdbfe' }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = '#e2e8f0' }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; e.currentTarget.style.borderColor = '#1E3A5F' }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = '#1E293B' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                       <Space size={10}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', fontFamily: "'Fira Code', monospace" }}>#{idx + 1}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: "'Fira Code', monospace" }}>#{idx + 1}</span>
                         <Tag color={PLATFORM_COLORS[post.platform]} style={{ margin: 0, borderRadius: 6, fontSize: 11 }}>
                           {PLATFORM_LABELS[post.platform] || post.platform}
                         </Tag>
@@ -677,8 +682,8 @@ export default function SentimentPage() {
                         {post.author_avatar && (
                           <img src={post.author_avatar} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
                         )}
-                        {post.author_name && <span style={{ color: '#94a3b8', fontSize: 12 }}>@{post.author_name}</span>}
-                        {post.published_at && <span style={{ color: '#cbd5e1', fontSize: 11 }}>{fmtDt(post.published_at)}</span>}
+                        {post.author_name && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>@{post.author_name}</span>}
+                        {post.published_at && <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{fmtDt(post.published_at)}</span>}
                       </Space>
                       <Space size={16}>
                         <ImpactBadge score={post.impact_score} />

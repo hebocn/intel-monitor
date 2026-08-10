@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
-  Input, Button, Tag, Space, message, Skeleton, Empty, Spin, Row, Col,
+  Input, Button, Space, message, Skeleton, Empty, Spin, Row, Col,
   Avatar, Card, Progress, Divider, Tooltip, Radio, Select,
 } from 'antd'
 import {
@@ -32,17 +32,29 @@ interface MatchTask {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
-const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', x: '#000000' }
+const PLATFORM_COLORS: Record<string, string> = { weibo: '#e6162d', x: '#1DA1F2' }
 const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', x: 'X' }
+
+// ── Subdued tag colors (translucent bg + soft text, low visual weight) ──
+type TagStyle = { bg: string; text: string }
+const TAG: Record<string, TagStyle | ((p: string) => TagStyle)> = {
+  platform: (p: string) => {
+    const c = PLATFORM_COLORS[p] || '#60A5FA'
+    return { bg: `${c}1A`, text: c }               // 10% opacity bg
+  },
+  label:    { bg: 'rgba(34,197,94,0.08)',  text: '#6EE7B7' },   // domain/tone/lang/activity
+  keyword:  { bg: 'rgba(20,184,166,0.08)', text: '#5EEAD4' },   // keyword pills
+  summary:  { bg: 'rgba(148,163,184,0.06)', text: '#94A3B8' },  // AI summary
+}
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
-  pending:            { color: '#f59e0b', icon: <ClockCircleOutlined />, text: '等待' },
-  searching:          { color: '#3b82f6', icon: <SyncOutlined spin />, text: '搜索中' },
-  fetching_posts:     { color: '#3b82f6', icon: <SyncOutlined spin />, text: '抓取帖子' },
-  fetching_anchor:    { color: '#3b82f6', icon: <SyncOutlined spin />, text: '获取锚点用户' },
-  profiling:          { color: '#8b5cf6', icon: <SyncOutlined spin />, text: '画像分析' },
-  comparing:          { color: '#ec4899', icon: <SyncOutlined spin />, text: '相似度计算' },
-  completed:          { color: '#10b981', icon: <CheckCircleOutlined />, text: '完成' },
-  failed:             { color: '#ef4444', icon: <CloseCircleOutlined />, text: '失败' },
+  pending:            { color: '#F59E0B', icon: <ClockCircleOutlined />, text: '等待' },
+  searching:          { color: '#60A5FA', icon: <SyncOutlined spin />, text: '搜索中' },
+  fetching_posts:     { color: '#60A5FA', icon: <SyncOutlined spin />, text: '抓取帖子' },
+  fetching_anchor:    { color: '#60A5FA', icon: <SyncOutlined spin />, text: '获取锚点用户' },
+  profiling:          { color: '#A78BFA', icon: <SyncOutlined spin />, text: '画像分析' },
+  comparing:          { color: '#F472B6', icon: <SyncOutlined spin />, text: '相似度计算' },
+  completed:          { color: '#22C55E', icon: <CheckCircleOutlined />, text: '完成' },
+  failed:             { color: '#EF4444', icon: <CloseCircleOutlined />, text: '失败' },
 }
 const R = { sm: 8, md: 12, lg: 16, xl: 20 }
 
@@ -55,12 +67,26 @@ const fmtDt = (iso: string | null): string => {
 }
 const fmtScore = (s: number) => `${(s * 100).toFixed(0)}%`
 
+// ── Subdued translucent tag ─────────────────────────────────────────────
+function StyledTag({ children, color: s, style }: { children: React.ReactNode; color: TagStyle; style?: React.CSSProperties }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: s.bg, color: s.text,
+      borderRadius: 6, padding: '1px 10px',
+      fontSize: 12, fontWeight: 600,
+      lineHeight: '22px', whiteSpace: 'nowrap',
+      ...style,
+    }}>{children}</span>
+  )
+}
+
 // ── Sub-Components ───────────────────────────────────────────────────────
 function ConfidenceBadge({ score }: { score: number }) {
-  const palette = score >= 0.7 ? { bg: '#f0fdf4', c: '#16a34a', b: '#bbf7d0' }
-    : score >= 0.5 ? { bg: '#fffbeb', c: '#d97706', b: '#fde68a' }
-    : score >= 0.3 ? { bg: '#eff6ff', c: '#2563eb', b: '#bfdbfe' }
-    :               { bg: '#f8fafc', c: '#94a3b8', b: '#e2e8f0' }
+  const palette = score >= 0.7 ? { bg: '#0A1F14', c: '#22C55E', b: '#14532D' }
+    : score >= 0.5 ? { bg: '#1F1500', c: '#F59E0B', b: '#5C4400' }
+    : score >= 0.3 ? { bg: '#0C1929', c: '#3B82F6', b: '#1E3A5F' }
+    :               { bg: 'var(--surface-1)', c: 'var(--text-muted)', b: 'var(--border)' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -77,22 +103,22 @@ function CandidateCard({ candidate, result }: { candidate: Candidate; result?: M
   return (
     <div style={{
       padding: '14px 16px', borderRadius: R.md,
-      border: `1px solid ${PLATFORM_COLORS[candidate.platform]}20`,
-      borderLeftWidth: 3, borderLeftColor: PLATFORM_COLORS[candidate.platform] || '#3b82f6',
-      background: '#fafafa',
+      border: `1px solid rgba(248,250,252,0.08)`,
+      borderLeftWidth: 3, borderLeftColor: PLATFORM_COLORS[candidate.platform] || '#60A5FA',
+      background: 'rgba(248,250,252,0.03)',
     }}>
       {hasScore && (
         <div style={{
           float: 'right', padding: '2px 8px', borderRadius: 10,
-          background: '#f0fdf4', border: '1px solid #bbf7d0',
-          fontSize: 12, fontWeight: 700, color: '#16a34a',
+          background: '#0A1F14', border: '1px solid #14532D',
+          fontSize: 12, fontWeight: 700, color: '#22C55E',
           fontFamily: "'Fira Code', monospace",
         }}>{scorePct}</div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Tag color={PLATFORM_COLORS[candidate.platform]} style={{ margin: 0, borderRadius: 6, fontSize: 11 }}>
+        <StyledTag color={TAG.platform(candidate.platform)}>
           {PLATFORM_LABELS[candidate.platform] || candidate.platform}
-        </Tag>
+        </StyledTag>
         {candidate.profile_url && (
           <Tooltip title="查看主页">
             <Button type="link" size="small" icon={<LinkOutlined />}
@@ -103,23 +129,23 @@ function CandidateCard({ candidate, result }: { candidate: Candidate; result?: M
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <Avatar size={40} src={candidate.avatar_url} icon={<UserOutlined />} style={{ flexShrink: 0 }} />
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {candidate.nickname}
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             @{candidate.platform_uid}
             {candidate.followers_count > 0 && ` · ${fmt(candidate.followers_count)} 粉丝`}
           </div>
         </div>
       </div>
       {candidate.bio && (
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {candidate.bio}
         </div>
       )}
       <ProfileCard profileJson={candidate.profile_json} />
       {candidate.score_detail_json && (
-        <div style={{ marginTop: 6, fontSize: 11, color: '#94a3b8', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {(() => {
             try {
               const sd = JSON.parse(candidate.score_detail_json)
@@ -141,18 +167,22 @@ function ProfileCard({ profileJson, compact }: { profileJson: string | null; com
     const p = JSON.parse(profileJson)
     if (!p || Object.keys(p).length === 0) return null
     return (
-      <div style={{ marginTop: 6, background: '#f8fafc', borderRadius: 8, padding: '8px 12px', fontSize: 12, lineHeight: 1.8 }}>
-        {p.summary && <div style={{ color: '#334155', fontWeight: 500, marginBottom: 4 }}>📝 {p.summary}</div>}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', color: '#64748b' }}>
-          {p.domain && <span>🏷 {p.domain}</span>}
-          {p.tone && <span>💬 {p.tone}</span>}
-          {p.lang && <span>🌐 {p.lang.toUpperCase()}</span>}
-          {p.activity_level && <span>📊 活跃度: {p.activity_level}</span>}
+      <div style={{ marginTop: 6, background: 'var(--surface-1)', borderRadius: 8, padding: '8px 12px', fontSize: 12, lineHeight: 1.8 }}>
+        {p.summary && (
+          <div style={{ marginBottom: 6 }}>
+            <StyledTag color={TAG.summary} style={{ fontSize: 11 }}>📝 AI 摘要</StyledTag>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: p.keywords?.length > 0 ? 6 : 0 }}>
+          {p.domain && <StyledTag color={TAG.label} style={{ fontSize: 11 }}>🏷 {p.domain}</StyledTag>}
+          {p.tone && <StyledTag color={TAG.label} style={{ fontSize: 11 }}>💬 {p.tone}</StyledTag>}
+          {p.lang && <StyledTag color={TAG.label} style={{ fontSize: 11 }}>🌐 {p.lang.toUpperCase()}</StyledTag>}
+          {p.activity_level && <StyledTag color={TAG.label} style={{ fontSize: 11 }}>📊 {p.activity_level}</StyledTag>}
         </div>
         {p.keywords && p.keywords.length > 0 && (
-          <div style={{ marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {p.keywords.map((k: string, i: number) => (
-              <Tag key={i} style={{ fontSize: 11, marginBottom: 2 }}>{k}</Tag>
+              <StyledTag key={i} color={TAG.keyword} style={{ fontSize: 11 }}>#{k}</StyledTag>
             ))}
           </div>
         )}
@@ -162,14 +192,14 @@ function ProfileCard({ profileJson, compact }: { profileJson: string | null; com
 }
 
 function PulsingDot() {
-  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', marginRight: 8, animation: 'pulse2 1.5s infinite' }} />
+  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#60A5FA', marginRight: 8, animation: 'pulse2 1.5s infinite' }} />
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
 export default function AccountMatchPage() {
   const [matchMode, setMatchMode] = useState<string>('nickname')
   const [targetName, setTargetName] = useState('')
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['weibo', 'x'])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [anchorPlatform, setAnchorPlatform] = useState<string>('weibo')
   const [searching, setSearching] = useState(false)
   const [tasks, setTasks] = useState<MatchTask[]>([])
@@ -265,7 +295,7 @@ export default function AccountMatchPage() {
       </div>
 
       {/* Search Bar */}
-      <div style={{ background: '#fff', borderRadius: R.xl, padding: '24px 28px', marginBottom: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+      <div style={{ background: 'var(--surface-2)', borderRadius: R.xl, padding: '24px 28px', marginBottom: 24, border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
         {/* Mode selector */}
         <div style={{ marginBottom: 16 }}>
           <Radio.Group value={matchMode} onChange={e => setMatchMode(e.target.value)} buttonStyle="solid" size="middle">
@@ -276,7 +306,7 @@ export default function AccountMatchPage() {
               <UserSwitchOutlined /> 锚点画像匹配
             </Radio.Button>
           </Radio.Group>
-          <span style={{ marginLeft: 16, fontSize: 12, color: '#94a3b8' }}>
+          <span style={{ marginLeft: 16, fontSize: 12, color: 'var(--text-muted)' }}>
             {matchMode === 'profile'
               ? '输入某个平台账号的UID/URL，自动分析画像并在其他平台搜索相似账号'
               : '输入昵称关键词，在两个平台搜索匹配的账号并生成AI画像'}
@@ -312,9 +342,9 @@ export default function AccountMatchPage() {
                       fontSize: 14,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      border: `2px solid ${checked ? PLATFORM_COLORS[p.platform] : '#e2e8f0'}`,
-                      background: checked ? `${PLATFORM_COLORS[p.platform]}10` : '#fff',
-                      color: checked ? PLATFORM_COLORS[p.platform] : '#64748b',
+                      border: `2px solid ${checked ? '#22C55E' : 'rgba(248,250,252,0.1)'}`,
+                      background: checked ? 'rgba(34,197,94,0.12)' : 'rgba(248,250,252,0.03)',
+                      color: checked ? '#22C55E' : 'var(--text-muted)',
                       transition: 'all 0.2s',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}>
@@ -330,13 +360,13 @@ export default function AccountMatchPage() {
       <Row gutter={24}>
         {/* Sidebar — History */}
         <Col xs={24} lg={6}>
-          <div style={{ background: '#fff', borderRadius: R.lg, padding: '18px 20px', border: '1px solid #e2e8f0', height: 'calc(100vh - 360px)', overflow: 'auto', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '18px 20px', border: '1px solid var(--border)', height: 'calc(100vh - 360px)', overflow: 'auto', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <ClockCircleOutlined />比对历史
-              {tasks.length > 0 && <span style={{ color: '#94a3b8', fontWeight: 400 }}>({tasks.length})</span>}
+              {tasks.length > 0 && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({tasks.length})</span>}
             </div>
             {loadingTasks ? <Skeleton active paragraph={{ rows: 6 }} /> : !tasks.length ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 12 }}>暂无记录</div>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 12 }}>暂无记录</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {tasks.map(t => {
@@ -348,17 +378,17 @@ export default function AccountMatchPage() {
                     <div key={t.id} onClick={() => { stopPolling(); fetchTaskDetail(t.id) }}
                       style={{
                         padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                        background: active ? '#eff6ff' : 'transparent',
-                        border: active ? '1px solid #bfdbfe' : '1px solid transparent',
+                        background: active ? '#0C1929' : 'transparent',
+                        border: active ? '1px solid #1E3A5F' : '1px solid transparent',
                         transition: 'all 0.15s',
                       }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
                           {modeLabel} {t.target_name}
                         </span>
                         <span style={{ fontSize: 11, color: st.color, fontWeight: 500 }}>{st.text}</span>
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
                         <span>{t.total_candidates || 0} 候选 · {t.total_groups || 0} 关联</span>
                         <span>{fmtDt(t.created_at)}</span>
                       </div>
@@ -373,20 +403,20 @@ export default function AccountMatchPage() {
         {/* Main — Results */}
         <Col xs={24} lg={18}>
           {!selectedTask ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: '80px 20px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f1f5f9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <SwapOutlined style={{ fontSize: 24, color: '#cbd5e1' }} />
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '80px 20px', textAlign: 'center', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--surface-1)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <SwapOutlined style={{ fontSize: 24, color: 'var(--text-secondary)' }} />
               </div>
-              <div style={{ fontSize: 15, color: '#64748b', fontWeight: 500 }}>选择左侧历史比对查看结果</div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>或在上方输入账号名开始新的比对</div>
+              <div style={{ fontSize: 15, color: 'var(--text-muted)', fontWeight: 500 }}>选择左侧历史比对查看结果</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>或在上方输入账号名开始新的比对</div>
             </div>
           ) : (['pending', 'searching', 'fetching_posts', 'profiling', 'comparing'].includes(selectedTask.status) || selectedTask.status?.startsWith('fetching_anchor')) ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '60px 20px', textAlign: 'center', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
               <Spin size="large" />
-              <div style={{ marginTop: 16, fontSize: 14, color: '#475569', fontWeight: 600 }}>
+              <div style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)', fontWeight: 600 }}>
                 <PulsingDot />正在比对 "{selectedTask.target_name}"
               </div>
-              <div style={{ marginTop: 8, fontSize: 13, color: '#94a3b8' }}>
+              <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
                 {STATUS_MAP[selectedTask.status]?.text || '处理中'}
                 {selectedTask.match_mode === 'profile' && <span> · 锚点画像模式</span>}
               </div>
@@ -394,10 +424,10 @@ export default function AccountMatchPage() {
                 status="active" showInfo={false} style={{ maxWidth: 300, margin: '16px auto' }} />
             </div>
           ) : selectedTask.status === 'failed' ? (
-            <div style={{ background: '#fff', borderRadius: R.lg, padding: 24, border: '1px solid #fecaca' }}>
-              <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: 8 }}>比对失败</div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: 24, border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div style={{ color: '#EF4444', fontWeight: 600, marginBottom: 8 }}>比对失败</div>
               {selectedTask.error_log && (
-                <pre style={{ fontSize: 11, color: '#7f1d1d', background: '#fef2f2', padding: 12, borderRadius: R.sm, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+                <pre style={{ fontSize: 11, color: '#EF4444', background: '#1F0A0A', padding: 12, borderRadius: R.sm, maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
                   {JSON.stringify(JSON.parse(selectedTask.error_log), null, 2)}
                 </pre>
               )}
@@ -407,22 +437,22 @@ export default function AccountMatchPage() {
             <div>
               {/* KPI Row */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 140px', background: '#fff', borderRadius: R.md, padding: '14px 18px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>候选账号</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#1e3a8a' }}>{selectedTask.total_candidates}</div>
+                <div style={{ flex: '1 1 140px', background: 'var(--surface-2)', borderRadius: R.md, padding: '14px 18px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>候选账号</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#60A5FA' }}>{selectedTask.total_candidates}</div>
                 </div>
-                <div style={{ flex: '1 1 140px', background: '#fff', borderRadius: R.md, padding: '14px 18px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>匹配结果</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: '#9a3412' }}>{selectedTask.total_groups}</div>
+                <div style={{ flex: '1 1 140px', background: 'var(--surface-2)', borderRadius: R.md, padding: '14px 18px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>匹配结果</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#F59E0B' }}>{selectedTask.total_groups}</div>
                 </div>
-                <div style={{ flex: '1 1 140px', background: '#fff', borderRadius: R.md, padding: '14px 18px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
+                <div style={{ flex: '1 1 140px', background: 'var(--surface-2)', borderRadius: R.md, padding: '14px 18px', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     模式 · {selectedTask.match_mode === 'profile' ? '锚点画像' : '昵称搜索'}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#14532d' }}>{selectedTask.target_name}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#22C55E' }}>{selectedTask.target_name}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{fmtDt(selectedTask.created_at)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtDt(selectedTask.created_at)}</span>
                   <Button size="small" danger type="text" icon={<DeleteOutlined />} onClick={() => handleDelete(selectedTask.id)} />
                 </div>
               </div>
@@ -430,10 +460,10 @@ export default function AccountMatchPage() {
               {/* Anchor profile display (Scenario 1) */}
               {selectedTask.match_mode === 'profile' && selectedTask.anchor_profile_json && (
                 <div style={{
-                  background: '#f0fdf4', borderRadius: R.lg, padding: '16px 20px',
-                  marginBottom: 16, border: '1px solid #bbf7d0',
+                  background: '#0A1F14', borderRadius: R.lg, padding: '16px 20px',
+                  marginBottom: 16, border: '1px solid #14532D',
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#166534', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#22C55E', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <ProfileOutlined /> 锚点用户画像
                   </div>
                   <ProfileCard profileJson={selectedTask.anchor_profile_json} />
@@ -442,13 +472,13 @@ export default function AccountMatchPage() {
 
               {/* Match Results — Top 5 */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AimOutlined style={{ color: '#52b788' }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AimOutlined style={{ color: '#22C55E' }} />
                   匹配结果（Top 5 相似度最高账号）
-                  {selectedTask.match_mode === 'profile' && <span style={{ fontWeight: 400, fontSize: 12, color: '#94a3b8' }}> · 基于画像内容+昵称+发帖时间综合评分</span>}
+                  {selectedTask.match_mode === 'profile' && <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)' }}> · 基于画像内容+昵称+发帖时间综合评分</span>}
                 </div>
                 {(!selectedTask.results || selectedTask.results.length === 0) ? (
-                  <div style={{ background: '#fff', borderRadius: R.lg, padding: '40px 20px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: 'var(--surface-2)', borderRadius: R.lg, padding: '40px 20px', textAlign: 'center', border: '1px solid var(--border)' }}>
                     <Empty description="未找到匹配账号，请尝试不同关键词" />
                   </div>
                 ) : (
@@ -457,20 +487,22 @@ export default function AccountMatchPage() {
                       const groupCandidates = getResultCandidates(result)
                       return groupCandidates.map((candidate) => (
                         <Card key={`${result.id}-${candidate.id}`} style={{
-                          borderRadius: R.lg, border: '1px solid #e2e8f0',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          borderRadius: R.lg,
+                          border: '1px solid var(--border)',
+                          boxShadow: 'var(--shadow-sm)',
+                          background: 'var(--surface-2)',
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', fontFamily: "'Fira Code', monospace" }}>#{gIdx + 1}</span>
-                                <Tag color={PLATFORM_COLORS[candidate.platform]} style={{ margin: 0, borderRadius: 6, fontSize: 11 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: "'Fira Code', monospace" }}>#{gIdx + 1}</span>
+                                <StyledTag color={TAG.platform(candidate.platform)}>
                                   {PLATFORM_LABELS[candidate.platform] || candidate.platform}
-                                </Tag>
+                                </StyledTag>
                                 <Avatar size={32} src={candidate.avatar_url} icon={<UserOutlined />} />
                                 <div>
-                                  <span style={{ fontWeight: 600, fontSize: 15, color: '#1e293b' }}>{candidate.nickname}</span>
-                                  <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>@{candidate.platform_uid}</span>
+                                  <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>{candidate.nickname}</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>@{candidate.platform_uid}</span>
                                 </div>
                                 {candidate.profile_url && (
                                   <Tooltip title="查看主页">
@@ -480,7 +512,7 @@ export default function AccountMatchPage() {
                                 )}
                               </div>
                               {candidate.bio && (
-                                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8, lineHeight: 1.5 }}>
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>
                                   {candidate.bio}
                                 </div>
                               )}
@@ -490,7 +522,7 @@ export default function AccountMatchPage() {
                             <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 120 }}>
                               <ConfidenceBadge score={candidate.match_score} />
                               {candidate.score_detail_json && (
-                                <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
                                   {(() => {
                                     try {
                                       const sd = JSON.parse(candidate.score_detail_json)
@@ -499,7 +531,7 @@ export default function AccountMatchPage() {
                                         <Tooltip key={k} title={`${labels[k]||k}: ${((v as number) * 100).toFixed(0)}%`}>
                                           <span style={{ display: 'inline-flex', gap: 6 }}>
                                             <span>{labels[k] || k}</span>
-                                            <span style={{ fontWeight: 700, color: '#1e293b', fontFamily: "'Fira Code', monospace", minWidth: 36, textAlign: 'right' }}>
+                                            <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontFamily: "'Fira Code', monospace", minWidth: 36, textAlign: 'right' }}>
                                               {`${((v as number) * 100).toFixed(0)}%`}
                                             </span>
                                           </span>
@@ -521,7 +553,7 @@ export default function AccountMatchPage() {
               {/* All Candidates */}
               {selectedTask.candidates && selectedTask.candidates.length > 0 && (
                 <>
-                  <Divider style={{ margin: '24px 0 16px', fontSize: 13, color: '#94a3b8' }}>
+                  <Divider style={{ margin: '24px 0 16px', fontSize: 13, color: 'var(--text-muted)' }}>
                     <ClockCircleOutlined /> 全部候选账号 ({selectedTask.candidates.length})
                   </Divider>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>

@@ -37,11 +37,11 @@ interface ReportListItem {
 // ── Constants ──────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:   { color: '#f59e0b', icon: <ClockCircleOutlined />,    text: '排队中' },
-  searching: { color: '#3b82f6', icon: <SearchOutlined />,         text: '搜索中' },
-  scraping:  { color: '#8b5cf6', icon: <GlobalOutlined />,         text: '抓取中' },
-  analyzing: { color: '#ec4899', icon: <ExperimentOutlined />,     text: '分析中' },
-  writing:   { color: '#f97316', icon: <SyncOutlined spin />,      text: '撰写中' },
-  reviewing: { color: '#14b8a6', icon: <SyncOutlined spin />,      text: '润色中' },
+  searching: { color: '#60A5FA', icon: <SearchOutlined />,         text: '搜索中' },
+  scraping:  { color: '#A78BFA', icon: <GlobalOutlined />,         text: '抓取中' },
+  analyzing: { color: '#F472B6', icon: <ExperimentOutlined />,     text: '分析中' },
+  writing:   { color: '#F59E0B', icon: <SyncOutlined spin />,      text: '撰写中' },
+  reviewing: { color: '#2DD4BF', icon: <SyncOutlined spin />,      text: '润色中' },
   completed: { color: '#10b981', icon: <CheckCircleOutlined />,    text: '已完成' },
   failed:    { color: '#ef4444', icon: <CloseCircleOutlined />,    text: '失败' },
 }
@@ -56,8 +56,8 @@ const fmtDt = (iso: string | null): string => {
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const sectionStyle: React.CSSProperties = {
-  background: '#ffffff', borderRadius: R.lg, padding: 24, marginBottom: 16,
-  border: '1px solid rgba(45,106,79,0.08)',
+  background: 'var(--surface-2)', borderRadius: R.lg, padding: 24, marginBottom: 16,
+  border: '1px solid rgba(15,118,110,0.08)',
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
@@ -224,8 +224,8 @@ export default function IntelligenceReportPage() {
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <Title level={3} style={{ margin: 0, color: '#1a2e26' }}>
-            <FileTextOutlined style={{ marginRight: 10, color: '#2d6a4f' }} />
+          <Title level={3} style={{ margin: 0, color: 'var(--text-primary)' }}>
+            <FileTextOutlined style={{ marginRight: 10, color: '#0f766e' }} />
             战略情报报告
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>基于开源数据生成结构化情报分析报告 · 宗教领域战略情报攻坚战</Text>
@@ -299,7 +299,7 @@ export default function IntelligenceReportPage() {
           <Col span={24}>
             <Button type="primary" size="large" icon={<FileTextOutlined />}
               loading={loading} onClick={handleGenerate}
-              style={{ background: '#2d6a4f', borderColor: '#2d6a4f', height: 48, fontSize: 16, paddingInline: 32 }}>
+              style={{ background: '#0f766e', borderColor: '#0f766e', height: 48, fontSize: 16, paddingInline: 32 }}>
               生成战略情报报告
             </Button>
           </Col>
@@ -322,9 +322,9 @@ export default function IntelligenceReportPage() {
               return (
                 <div key={r.id} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '14px 16px', borderBottom: '1px solid rgba(45,106,79,0.06)',
+                  padding: '14px 16px', borderBottom: '1px solid rgba(15,118,110,0.06)',
                   borderRadius: R.md, transition: 'background 0.2s',
-                  ...(r.id === selectedReport?.id ? { background: 'rgba(45,106,79,0.04)' } : {}),
+                  ...(r.id === selectedReport?.id ? { background: 'rgba(15,118,110,0.04)' } : {}),
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -409,7 +409,8 @@ export default function IntelligenceReportPage() {
             {/* Report content */}
             {selectedReport.status === 'completed' && selectedReport.report_markdown && (
               <div style={{
-                background: '#fafbfb', borderRadius: R.md, padding: 32, border: '1px solid rgba(45,106,79,0.08)',
+                background: 'var(--surface-1)', borderRadius: R.md, padding: 32,
+                border: '1px solid var(--border)',
                 maxHeight: '60vh', overflow: 'auto',
               }}>
                 <ReportMarkdown content={selectedReport.report_markdown} />
@@ -489,14 +490,14 @@ function ReportMarkdown({ content }: { content: string }) {
 
     // h1: # xxx
     if (/^# (?!#)/.test(trimmed)) {
-      elements.push(<Title key={i} level={3} style={{ color: '#1a2e26', marginTop: 24 }}>{trimmed.replace(/^# /, '')}</Title>)
+      elements.push(<Title key={i} level={3} style={{ color: 'var(--text-primary)', marginTop: 24 }}>{trimmed.replace(/^# /, '')}</Title>)
       i++; continue
     }
     // h2: ## xxx
     if (/^## (?!#)/.test(trimmed)) {
       elements.push(
-        <div key={i} style={{ marginTop: 24, marginBottom: 12, paddingLeft: 12, borderLeft: '3px solid #2d6a4f' }}>
-          <Text strong style={{ fontSize: 16, color: '#2d6a4f' }}>{trimmed.replace(/^## /, '')}</Text>
+        <div key={i} style={{ marginTop: 24, marginBottom: 12, paddingLeft: 12, borderLeft: '3px solid #0f766e' }}>
+          <Text strong style={{ fontSize: 16, color: '#0f766e' }}>{trimmed.replace(/^## /, '')}</Text>
         </div>
       )
       i++; continue
@@ -529,7 +530,7 @@ function ReportMarkdown({ content }: { content: string }) {
         i++
       }
       elements.push(
-        <div key={i} style={{ borderLeft: '3px solid #ccc', paddingLeft: 14, margin: '8px 0', color: '#666', fontStyle: 'italic' }}>
+        <div key={i} style={{ borderLeft: '3px solid var(--border-strong)', paddingLeft: 14, margin: '8px 0', color: 'var(--text-muted)', fontStyle: 'italic' }}>
           {bqLines.map((bql, j) => <div key={j}>{formatInline(bql)}</div>)}
         </div>
       )
@@ -550,13 +551,13 @@ function ReportMarkdown({ content }: { content: string }) {
           <div key={i} style={{ overflowX: 'auto', margin: '12px 0' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
               {dataRows.map((row, ri) => (
-                <tr key={ri} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                <tr key={ri} style={{ borderBottom: '1px solid var(--border)' }}>
                   {row.map((cell, ci) => {
                     const CellTag = ri === 0 ? 'th' : 'td'
                     return (
                       <CellTag key={ci} style={{
                         padding: '8px 12px', textAlign: 'left',
-                        background: ri === 0 ? 'rgba(45,106,79,0.06)' : undefined,
+                        background: ri === 0 ? 'rgba(15,118,110,0.06)' : undefined,
                         fontWeight: ri === 0 ? 600 : 400,
                       }}>
                         {formatInline(cell.trim())}

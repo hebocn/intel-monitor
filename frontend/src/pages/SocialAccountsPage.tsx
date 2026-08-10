@@ -128,8 +128,8 @@ function AccountCard({
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '3px 12px', borderRadius: 12,
-            background: target.is_active ? 'rgba(82,183,136,0.08)' : 'rgba(140,140,140,0.08)',
-            color: target.is_active ? '#52b788' : '#8c8c8c',
+            background: target.is_active ? 'rgba(34,197,94,0.08)' : 'rgba(140,140,140,0.08)',
+            color: target.is_active ? '#22C55E' : '#8c8c8c',
             fontSize: 12, fontWeight: 600,
           }}>
             {target.is_active ? <CheckCircleOutlined /> : <PauseCircleOutlined />}
@@ -144,7 +144,7 @@ function AccountCard({
               icon={<PlayCircleOutlined />}
               onClick={onRun}
               loading={running}
-              style={{ color: '#2d6a4f' }}
+              style={{ color: '#0f766e' }}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -214,8 +214,8 @@ function AccountCard({
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '3px 12px', borderRadius: 12,
-              background: 'rgba(45,106,79,0.08)',
-              color: '#2d6a4f', fontSize: 12, fontWeight: 600,
+              background: 'rgba(15,118,110,0.08)',
+              color: '#0f766e', fontSize: 12, fontWeight: 600,
             }}>
               <ClockCircleOutlined spin />
               执行中...
@@ -378,7 +378,7 @@ export default function SocialAccountsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} style={{
-              background: '#fff', borderRadius: 16, border: '1px solid var(--border)', padding: '22px',
+              background: 'var(--surface-2)', borderRadius: 16, border: '1px solid var(--border)', padding: '22px',
             }}>
               <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                 <Skeleton.Input active style={{ width: 80, height: 26, borderRadius: 12 }} />

@@ -122,23 +122,23 @@ export default function LoginPage({ onLogin }: Props) {
         position: 'absolute', top: '15%', left: '45%',
         width: 700, height: 700,
         transform: 'translate(-50%, -50%)',
-        background: 'radial-gradient(circle, rgba(45,106,79,0.06) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(15,118,110,0.06) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', bottom: '5%', right: '15%',
         width: 500, height: 500,
-        background: 'radial-gradient(circle, rgba(45,106,79,0.04) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(15,118,110,0.04) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
       {/* Corner lines */}
-      <div style={{ position: 'absolute', top: 48, left: 48, width: 60, height: 60, borderTop: '1px solid rgba(45,106,79,0.12)', borderLeft: '1px solid rgba(45,106,79,0.12)' }} />
-      <div style={{ position: 'absolute', bottom: 48, right: 48, width: 60, height: 60, borderBottom: '1px solid rgba(45,106,79,0.12)', borderRight: '1px solid rgba(45,106,79,0.12)' }} />
+      <div style={{ position: 'absolute', top: 48, left: 48, width: 60, height: 60, borderTop: '1px solid rgba(15,118,110,0.12)', borderLeft: '1px solid rgba(15,118,110,0.12)' }} />
+      <div style={{ position: 'absolute', bottom: 48, right: 48, width: 60, height: 60, borderBottom: '1px solid rgba(15,118,110,0.12)', borderRight: '1px solid rgba(15,118,110,0.12)' }} />
 
       <Card className="animate-scale-in" style={{
         width: 460,
-        background: '#ffffff',
+        background: 'var(--surface-2)',
         border: '1px solid var(--border)',
         borderRadius: 20,
         boxShadow: '0 24px 80px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.04)',
@@ -150,7 +150,7 @@ export default function LoginPage({ onLogin }: Props) {
         {/* Top accent */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-          background: 'linear-gradient(90deg, transparent 10%, #2d6a4f, transparent 90%)',
+          background: 'linear-gradient(90deg, transparent 10%, #0f766e, transparent 90%)',
           opacity: 0.6,
         }} />
 
@@ -158,12 +158,12 @@ export default function LoginPage({ onLogin }: Props) {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             width: 76, height: 76, borderRadius: 18,
-            background: 'linear-gradient(135deg, rgba(45,106,79,0.12), rgba(45,106,79,0.04))',
-            border: '1px solid rgba(45,106,79,0.15)',
+            background: 'linear-gradient(135deg, rgba(15,118,110,0.12), rgba(15,118,110,0.04))',
+            border: '1px solid rgba(15,118,110,0.15)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: 20,
           }}>
-            <RadarChartOutlined style={{ fontSize: 34, color: '#2d6a4f' }} />
+            <RadarChartOutlined style={{ fontSize: 34, color: '#0f766e' }} />
           </div>
           <div style={{
             color: 'var(--text-primary)', fontWeight: 700,
@@ -203,8 +203,8 @@ export default function LoginPage({ onLogin }: Props) {
             showIcon
             style={{
               marginBottom: 16, borderRadius: 10, textAlign: 'center',
-              background: 'rgba(82,183,136,0.06)',
-              border: '1px solid rgba(82,183,136,0.15)',
+              background: 'rgba(34,197,94,0.06)',
+              border: '1px solid rgba(34,197,94,0.15)',
             }}
           />
         )}

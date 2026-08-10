@@ -121,6 +121,26 @@ async def _ensure_schema():
             "SELECT score_detail FROM account_match_results LIMIT 0",
             "ALTER TABLE account_match_results ADD COLUMN score_detail TEXT DEFAULT NULL",
         ),
+        (
+            "monitor_results_comments_ai_status",
+            "SELECT comments_ai_status FROM monitor_results LIMIT 0",
+            "ALTER TABLE monitor_results ADD COLUMN comments_ai_status VARCHAR(20) DEFAULT 'idle'",
+        ),
+        (
+            "hot_comments_rank_counts",
+            "SELECT global_rank FROM hot_comments LIMIT 0",
+            "ALTER TABLE hot_comments ADD COLUMN global_rank INTEGER DEFAULT 0",
+        ),
+        (
+            "hot_comments_reply_count",
+            "SELECT reply_count FROM hot_comments LIMIT 0",
+            "ALTER TABLE hot_comments ADD COLUMN reply_count INTEGER DEFAULT 0",
+        ),
+        (
+            "hot_comments_retweet_count",
+            "SELECT retweet_count FROM hot_comments LIMIT 0",
+            "ALTER TABLE hot_comments ADD COLUMN retweet_count INTEGER DEFAULT 0",
+        ),
     ]
 
     async with engine.begin() as conn:

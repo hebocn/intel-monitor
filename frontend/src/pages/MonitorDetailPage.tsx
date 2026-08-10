@@ -43,9 +43,9 @@ function relativeTime(dateStr: string | null): string {
 }
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  success: { color: '#52b788', bg: 'rgba(82,183,136,0.08)', icon: <CheckCircleOutlined />, label: '成功' },
+  success: { color: '#22C55E', bg: 'rgba(34,197,94,0.08)', icon: <CheckCircleOutlined />, label: '成功' },
   failed: { color: '#c75050', bg: 'rgba(199,80,80,0.08)', icon: <CloseCircleOutlined />, label: '失败' },
-  pending: { color: '#2d6a4f', bg: 'rgba(45,106,79,0.08)', icon: <ClockCircleOutlined spin />, label: '进行中' },
+  pending: { color: '#0f766e', bg: 'rgba(15,118,110,0.08)', icon: <ClockCircleOutlined spin />, label: '进行中' },
 }
 
 function ResultCard({
@@ -69,9 +69,9 @@ function ResultCard({
       className={`animate-fade-in-up delay-${Math.min(idx + 1, 6)}`}
       onClick={onClick}
       style={{
-        background: selected ? 'rgba(45,106,79,0.04)' : 'var(--surface-0, #fff)',
+        background: selected ? 'rgba(15,118,110,0.04)' : 'var(--surface-0, #fff)',
         borderRadius: 14,
-        border: selected ? '2px solid rgba(45,106,79,0.3)' : '1px solid var(--border)',
+        border: selected ? '2px solid rgba(15,118,110,0.3)' : '1px solid var(--border)',
         overflow: 'hidden',
         transition: 'all 0.2s ease',
         position: 'relative',
@@ -153,16 +153,16 @@ function CommentCard({ comment, rank, compact = false }: { comment: any; rank: n
     <div style={{
       display: 'flex', gap: 14, alignItems: 'flex-start',
       padding: '12px 16px',
-      background: isTop3 ? 'rgba(45,106,79,0.03)' : 'var(--surface-0, #fff)',
+      background: isTop3 ? 'rgba(15,118,110,0.03)' : 'var(--surface-0, #fff)',
       borderRadius: 12,
-      border: isTop3 ? '1px solid rgba(45,106,79,0.12)' : '1px solid var(--border)',
+      border: isTop3 ? '1px solid rgba(15,118,110,0.12)' : '1px solid var(--border)',
     }}>
       {/* Rank */}
       <div style={{
         minWidth: 30, height: 30, borderRadius: 10,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: isTop3 ? '#2d6a4f' : 'var(--surface-1)',
-        color: isTop3 ? '#fff' : 'var(--text-muted)',
+        background: isTop3 ? '#0f766e' : 'var(--surface-1)',
+        color: isTop3 ? 'var(--surface-2)' : 'var(--text-muted)',
         fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
       }}>
         {rank}
@@ -175,10 +175,10 @@ function CommentCard({ comment, rank, compact = false }: { comment: any; rank: n
           </Text>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 3,
-            color: '#2d6a4f', fontSize: 11,
+            color: '#0f766e', fontSize: 11,
           }}>
             <HeartOutlined />
-            <Text style={{ color: '#2d6a4f', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+            <Text style={{ color: '#0f766e', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               {comment.likes_count}
             </Text>
           </div>
@@ -335,7 +335,7 @@ export default function MonitorDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} style={{
-                background: '#fff', borderRadius: 14, border: '1px solid var(--border)', padding: '16px 18px',
+                background: 'var(--surface-2)', borderRadius: 14, border: '1px solid var(--border)', padding: '16px 18px',
               }}>
                 <div style={{ display: 'flex', gap: 12 }}>
                   <Skeleton.Input active style={{ width: 100, height: 18, borderRadius: 4 }} />
@@ -474,9 +474,9 @@ export default function MonitorDetailPage() {
                               </Text>
                             )}
                             {post.likes > 0 && (
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#2d6a4f', fontSize: 11 }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#0f766e', fontSize: 11 }}>
                                 <HeartOutlined />
-                                <Text style={{ color: '#2d6a4f', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                                <Text style={{ color: '#0f766e', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                                   {post.likes}
                                 </Text>
                               </div>
@@ -581,7 +581,7 @@ export default function MonitorDetailPage() {
           {selectedResult.summary && (
             <div style={{ marginBottom: 20 }}>
               <div style={{
-                background: 'linear-gradient(135deg, rgba(45,106,79,0.03), rgba(90,122,154,0.03))',
+                background: 'linear-gradient(135deg, rgba(15,118,110,0.03), rgba(90,122,154,0.03))',
                 border: '1px solid var(--border)',
                 borderRadius: 16,
                 padding: '20px 24px',
@@ -623,7 +623,7 @@ export default function MonitorDetailPage() {
                   display: 'flex', alignItems: 'center', gap: 6,
                   marginBottom: 12,
                 }}>
-                  <HeartOutlined style={{ color: '#2d6a4f', fontSize: 13 }} />
+                  <HeartOutlined style={{ color: '#0f766e', fontSize: 13 }} />
                   <Text style={{
                     color: 'var(--accent)', fontSize: 11, fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: 1.5,

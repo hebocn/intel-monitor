@@ -40,8 +40,8 @@ interface Topic {
   fetched_at: string | null
 }
 
-const GREEN = '#2d6a4f'
-const GREEN_LIGHT = '#52b788'
+const GREEN = '#22C55E'
+const GREEN_LIGHT = '#4ADE80'
 
 const MODE_LABELS: Record<string, string> = {
   public: '公开',
@@ -52,28 +52,13 @@ const MODE_LABELS: Record<string, string> = {
 
 const NOISE_SVG = `data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E`
 
-/* ── Glassmorphism styles — light premium frosted glass ──── */
+/* ── Glassmorphism styles — dark mode frosted glass ──── */
 
 const glassCard: React.CSSProperties = {
-  background: `
-    linear-gradient(160deg,
-      rgba(255,255,255,0.82) 0%,
-      rgba(255,255,255,0.64) 30%,
-      rgba(248,250,252,0.55) 60%,
-      rgba(241,245,249,0.60) 100%)
-  `,
-  backdropFilter: 'blur(44px) saturate(200%)',
-  WebkitBackdropFilter: 'blur(44px) saturate(200%)',
+  background: 'var(--surface-2)',
   borderRadius: 20,
-  border: '1px solid rgba(255,255,255,0.85)',
-  borderTop: '1px solid rgba(255,255,255,0.95)',
-  borderBottom: '1px solid rgba(0,0,0,0.06)',
-  boxShadow: `
-    0 4px 24px rgba(0,0,0,0.06),
-    0 1px 4px rgba(0,0,0,0.04),
-    inset 0 1px 0 rgba(255,255,255,0.80),
-    inset 0 -1px 0 rgba(0,0,0,0.04)
-  `,
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow-md)',
   position: 'relative' as const,
 }
 
@@ -83,69 +68,38 @@ const glassCardTexture: React.CSSProperties = {
   borderRadius: 20,
   pointerEvents: 'none' as const,
   background: `url("${NOISE_SVG}")`,
-  opacity: 0.6,
+  opacity: 0.15,
   zIndex: 0,
 }
 
 const glassItem: React.CSSProperties = {
-  background: `
-    linear-gradient(135deg,
-      rgba(255,255,255,0.78) 0%,
-      rgba(255,255,255,0.55) 50%,
-      rgba(241,245,249,0.50) 100%)
-  `,
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  background: 'var(--surface-1)',
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.80)',
-  borderTop: '1px solid rgba(255,255,255,0.92)',
-  boxShadow: `
-    0 1px 8px rgba(0,0,0,0.04),
-    inset 0 1px 0 rgba(255,255,255,0.70)
-  `,
+  border: '1px solid var(--border)',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
 }
 
 const glassItemHover: React.CSSProperties = {
-  background: `
-    linear-gradient(135deg,
-      rgba(255,255,255,0.92) 0%,
-      rgba(255,255,255,0.70) 50%,
-      rgba(241,245,249,0.65) 100%)
-  `,
-  border: '1px solid rgba(255,255,255,0.95)',
-  borderTop: '1px solid rgba(255,255,255,1.0)',
-  boxShadow: `
-    0 4px 20px rgba(0,0,0,0.08),
-    inset 0 1px 0 rgba(255,255,255,0.90),
-    0 0 40px rgba(45,106,79,0.06)
-  `,
+  background: 'rgba(248,250,252,0.06)',
+  border: '1px solid rgba(248,250,252,0.12)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
   transform: 'translateY(-1px)',
 }
 
 const glassChip: React.CSSProperties = {
-  background: `
-    linear-gradient(135deg,
-      rgba(255,255,255,0.72) 0%,
-      rgba(248,250,252,0.55) 100%)
-  `,
-  backdropFilter: 'blur(18px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+  background: 'rgba(248,250,252,0.04)',
   borderRadius: 24,
-  border: '1px solid rgba(255,255,255,0.80)',
-  borderTop: '1px solid rgba(255,255,255,0.92)',
-  boxShadow: `
-    0 1px 6px rgba(0,0,0,0.04),
-    inset 0 1px 0 rgba(255,255,255,0.60)
-  `,
+  border: '1px solid var(--border)',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
 }
 
 /* ── Color tokens ────────────────────────────────────────── */
 
-const ACCENT_GREEN = '#059669'
-const ACCENT_TEAL = '#0d9488'
-const TEXT_PRIMARY = '#0f172a'
-const TEXT_SECONDARY = '#475569'
-const TEXT_MUTED = '#94a3b8'
+const ACCENT_GREEN = '#22C55E'
+const ACCENT_TEAL = '#2DD4BF'
+const TEXT_PRIMARY = 'var(--text-primary)'
+const TEXT_SECONDARY = 'var(--text-secondary)'
+const TEXT_MUTED = 'var(--text-muted)'
 
 /* ── Topic row component ─────────────────────────────────── */
 
@@ -185,9 +139,9 @@ function TopicRow({ topic, idx, color, onDelete }: { topic: Topic; idx: number; 
         minWidth: 36, height: 36,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         borderRadius: 10,
-        background: rankStyle ? rankStyle.bg : 'rgba(0,0,0,0.03)',
-        border: rankStyle ? `1px solid ${rankStyle.border}` : '1px solid rgba(0,0,0,0.04)',
-        color: rankStyle ? rankStyle.text : '#94a3b8',
+        background: rankStyle ? rankStyle.bg : 'rgba(248,250,252,0.04)',
+        border: rankStyle ? `1px solid ${rankStyle.border}` : '1px solid rgba(248,250,252,0.04)',
+        color: rankStyle ? rankStyle.text : 'var(--text-muted)',
         fontWeight: 800,
         fontSize: isTop3 ? 16 : 13,
         fontFamily: 'var(--font-mono)',
@@ -243,7 +197,7 @@ function TopicRow({ topic, idx, color, onDelete }: { topic: Topic; idx: number; 
 
       {/* Link indicator */}
       {topic.url && (
-        <LinkOutlined style={{ color: '#475569', fontSize: 13, flexShrink: 0 }} />
+        <LinkOutlined style={{ color: 'var(--text-secondary)', fontSize: 13, flexShrink: 0 }} />
       )}
 
       {/* Delete */}
@@ -258,7 +212,7 @@ function TopicRow({ topic, idx, color, onDelete }: { topic: Topic; idx: number; 
             type="text" size="small"
             icon={<DeleteOutlined />}
             onClick={e => e.stopPropagation()}
-            style={{ color: '#475569', padding: '0 2px', width: 22, height: 22, flexShrink: 0 }}
+            style={{ color: 'var(--text-secondary)', padding: '0 2px', width: 22, height: 22, flexShrink: 0 }}
           />
         </Popconfirm>
       )}
@@ -277,18 +231,18 @@ const PLATFORM_LABELS_MAP: Record<string, string> = {
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
-  weibo: '#e53e3e',       zhihu: '#2563eb',
-  bilibili: '#fb7299',    v2ex: '#71717a',
+  weibo: '#e53e3e',       zhihu: '#3B82F6',
+  bilibili: '#fb7299',    v2ex: 'var(--text-muted)',
   hackernews: '#f59e0b',  reddit: '#ff4500',
-  twitter: '#1d9bf0',     douban_movie: '#16a34a',
-  douban_book: '#65a30d', xueqiu: '#2563eb',
-  'linux-do': '#d97706',  bbc: '#b91c1c',
+  twitter: '#1d9bf0',     douban_movie: '#22C55E',
+  douban_book: '#65a30d', xueqiu: '#3B82F6',
+  'linux-do': '#F59E0B',  bbc: '#b91c1c',
   google_trends: '#4285f4', stackoverflow: '#f48225',
-  github: '#7c3aed',
+  github: '#A78BFA',
 }
 
 function getPlatformColor(platform: string): string {
-  return PLATFORM_COLORS[platform] || '#059669'
+  return PLATFORM_COLORS[platform] || '#22C55E'
 }
 
 const PLATFORM_EMOJI: Record<string, string> = {
@@ -327,9 +281,9 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 const RANK_COLORS: Record<number, { bg: string; border: string; text: string; glow: string }> = {
-  1: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.30)', text: '#d97706', glow: '0 0 12px rgba(245,158,11,0.12)' },
-  2: { bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.28)', text: '#64748b', glow: 'none' },
-  3: { bg: 'rgba(217,119,6,0.08)',  border: 'rgba(217,119,6,0.22)',  text: '#b45309', glow: 'none' },
+  1: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.30)', text: '#F59E0B', glow: '0 0 12px rgba(245,158,11,0.12)' },
+  2: { bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.28)', text: 'var(--text-muted)', glow: 'none' },
+  3: { bg: 'rgba(217,119,6,0.08)',  border: 'rgba(217,119,6,0.22)',  text: '#F59E0B', glow: 'none' },
 }
 
 const CARD_DEFAULT_LIMIT = 10
@@ -380,19 +334,15 @@ function PlatformCard({
       <div style={{
         position: 'relative', zIndex: 1,
         padding: '16px 18px 14px',
-        background: `
-          linear-gradient(135deg,
-            ${hexToRgba(color, 0.08)} 0%,
-            rgba(255,255,255,0.02) 100%)
-        `,
-        borderBottom: `1px solid ${hexToRgba(color, 0.06)}`,
+        background: 'rgba(248,250,252,0.03)',
+        borderBottom: `1px solid var(--border)`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Drag handle */}
           {draggable && (
             <div style={{
-              color: 'rgba(0,0,0,0.12)', fontSize: 14, cursor: 'grab',
+              color: 'rgba(248,250,252,0.2)', fontSize: 14, cursor: 'grab',
               lineHeight: 0, flexShrink: 0,
             }}>
               ⋮⋮
@@ -451,7 +401,7 @@ function PlatformCard({
                 type="text" size="small"
                 icon={<DeleteOutlined />}
                 onClick={e => e.stopPropagation()}
-                style={{ color: '#475569', width: 24, height: 24 }}
+                style={{ color: 'var(--text-secondary)', width: 24, height: 24 }}
               />
             </Popconfirm>
           )}
@@ -686,7 +636,7 @@ export default function HotTopicsPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(170deg, #f8fafc 0%, #f1f5f9 25%, #fafafa 55%, #f0f4f0 80%, #f5f7fa 100%)',
+      background: 'linear-gradient(170deg, var(--surface-1) 0%, var(--surface-1) 25%, #050B14 55%, #050B14 80%, #050B14 100%)',
       margin: -32, padding: 32,
       position: 'relative',
     }}>
@@ -702,7 +652,7 @@ export default function HotTopicsPage() {
       <div style={{
         position: 'fixed', top: -180, right: -120, width: 800, height: 800,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.04) 35%, transparent 65%)',
+        background: 'radial-gradient(circle, rgba(96,165,250,0.12) 0%, rgba(167,139,250,0.04) 35%, transparent 65%)',
         filter: 'blur(120px)', pointerEvents: 'none', zIndex: 0,
       }} />
       <div style={{
@@ -714,13 +664,13 @@ export default function HotTopicsPage() {
       <div style={{
         position: 'fixed', top: '35%', left: '15%', width: 500, height: 500,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 60%)',
+        background: 'radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 60%)',
         filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
       }} />
       <div style={{
         position: 'fixed', top: '55%', right: '10%', width: 400, height: 400,
         borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(5,150,105,0.06) 0%, transparent 55%)',
+        background: 'radial-gradient(circle, rgba(15,118,110,0.06) 0%, transparent 55%)',
         filter: 'blur(70px)', pointerEvents: 'none', zIndex: 0,
       }} />
 
@@ -729,7 +679,7 @@ export default function HotTopicsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
           <div>
             <h1 className="page-title animate-fade-in-up" style={{
-              color: '#0f172a',
+              color: 'var(--text-primary)',
               fontWeight: 800,
               letterSpacing: 1,
             }}>
@@ -737,7 +687,7 @@ export default function HotTopicsPage() {
             </h1>
             <div className="page-subtitle animate-fade-in-up" style={{
               animationDelay: '0.05s',
-              color: '#475569',
+              color: 'var(--text-secondary)',
               letterSpacing: 1.5,
             }}>
               HOT TOPICS · AutoCLI · {sources.length} 个平台
@@ -768,9 +718,9 @@ export default function HotTopicsPage() {
               style={{
                 animationDelay: '0.1s',
                 borderRadius: 24, height: 38, fontWeight: 600,
-                background: 'linear-gradient(135deg, #059669, #059669)',
+                background: 'linear-gradient(135deg, #22C55E, #16A34A)',
                 border: 'none',
-                boxShadow: '0 4px 20px rgba(5,150,105,0.30)',
+                boxShadow: '0 4px 20px rgba(34,197,94,0.30)',
               }}
             >
               添加平台
@@ -821,25 +771,25 @@ export default function HotTopicsPage() {
                   cursor: 'pointer',
                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                   background: activePlatform === 'all'
-                    ? 'rgba(99,102,241,0.10)' : glassChip.background,
+                    ? 'rgba(96,165,250,0.12)' : glassChip.background,
                   border: activePlatform === 'all'
-                    ? '1px solid rgba(99,102,241,0.25)' : glassChip.border,
+                    ? '1px solid rgba(96,165,250,0.3)' : glassChip.border,
                   borderTop: activePlatform === 'all'
-                    ? '1px solid rgba(99,102,241,0.25)' : glassChip.borderTop,
+                    ? '1px solid rgba(96,165,250,0.3)' : glassChip.borderTop,
                   boxShadow: activePlatform === 'all'
-                    ? '0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(99,102,241,0.06), 0 0 16px rgba(99,102,241,0.06)'
+                    ? '0 2px 12px rgba(248,250,252,0.06), inset 0 1px 0 rgba(96,165,250,0.08), 0 0 16px rgba(96,165,250,0.08)'
                     : glassChip.boxShadow,
                 }}
                 onClick={() => setActivePlatform('all')}
               >
                 <GlobalOutlined style={{
                   fontSize: 13,
-                  color: activePlatform === 'all' ? '#6366f1' : TEXT_MUTED,
+                  color: activePlatform === 'all' ? '#60A5FA' : TEXT_MUTED,
                 }} />
                 <Text style={{
                   fontWeight: activePlatform === 'all' ? 700 : 500,
                   fontSize: 13,
-                  color: activePlatform === 'all' ? '#4f46e5' : TEXT_SECONDARY,
+                  color: activePlatform === 'all' ? '#93C5FD' : TEXT_SECONDARY,
                 }}>
                   全部
                 </Text>
@@ -862,14 +812,14 @@ export default function HotTopicsPage() {
                       border: isActive ? `1px solid ${hexToRgba(pColor, 0.28)}` : glassChip.border,
                       borderTop: isActive ? `1px solid ${hexToRgba(pColor, 0.28)}` : glassChip.borderTop,
                       boxShadow: isActive
-                        ? `0 2px 12px rgba(0,0,0,0.25), inset 0 1px 0 ${hexToRgba(pColor, 0.06)}, 0 0 16px ${hexToRgba(pColor, 0.08)}`
+                        ? `0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 ${hexToRgba(pColor, 0.06)}, 0 0 16px ${hexToRgba(pColor, 0.08)}`
                         : glassChip.boxShadow,
                     }}
                     onClick={() => setActivePlatform(isActive ? 'all' : source.platform)}
                   >
                     <div style={{
                       width: 8, height: 8, borderRadius: '50%',
-                      background: source.is_active ? pColor : '#cbd5e1',
+                      background: source.is_active ? pColor : 'var(--text-secondary)',
                       boxShadow: source.is_active ? `0 0 8px ${hexToRgba(pColor, 0.5)}` : 'none',
                     }} />
                     <Text style={{
@@ -894,7 +844,7 @@ export default function HotTopicsPage() {
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 1,
                       marginLeft: 4,
-                      borderLeft: '1px solid rgba(0,0,0,0.06)',
+                      borderLeft: '1px solid rgba(248,250,252,0.06)',
                       paddingLeft: 6,
                     }}>
                       <Tooltip title="抓取">
@@ -1009,8 +959,8 @@ export default function HotTopicsPage() {
                       <span>{p.label}</span>
                       <Tag style={{
                         marginLeft: 'auto', fontSize: 10,
-                        background: p.mode === 'public' ? 'rgba(82,183,136,0.1)' : 'rgba(255,152,0,0.1)',
-                        color: p.mode === 'public' ? '#52b788' : '#f57c00',
+                        background: p.mode === 'public' ? 'rgba(34,197,94,0.1)' : 'rgba(255,152,0,0.1)',
+                        color: p.mode === 'public' ? '#22C55E' : '#f57c00',
                         border: 'none', borderRadius: 6,
                       }}>
                         {MODE_LABELS[p.mode] || p.mode}
