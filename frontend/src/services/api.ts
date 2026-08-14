@@ -63,6 +63,7 @@ export const dashboardAPI = {
   get: () => api.get('/dashboard'),
   overview: () => api.get('/dashboard/overview'),
   health: () => api.get('/dashboard/health'),
+  geoSignals: () => api.get('/dashboard/geo-signals'),
 }
 
 // Schedule

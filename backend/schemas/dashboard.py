@@ -61,7 +61,7 @@ class HotTopicPreview(BaseModel):
     title: str
     platform: str
     platform_label: str
-    hot_value: int | None
+    hot_value: str | None
     rank: int | None
     url: str | None
 
@@ -91,3 +91,25 @@ class DashboardOverviewResponse(BaseModel):
     sentiment: SentimentSummary = SentimentSummary()
     intelligence: IntelligenceSummary = IntelligenceSummary()
     system_health: SystemHealth = SystemHealth()
+
+
+# ── Geo Signals (世界地图情报标注) ──
+
+class GeoSignal(BaseModel):
+    name: str = ""
+    lat: float
+    lng: float
+    platform: str
+    platform_label: str
+    color: str
+    category: str
+    count: int
+    title: str
+    summary: str
+
+
+class GeoSignalsResponse(BaseModel):
+    signals: list[GeoSignal]
+    total_signals: int
+    platforms_covered: int
+    regions_covered: int

@@ -1,0 +1,9 @@
+{
+  "name": "intel-monitor",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "intel-map",
+    "shared"
+  ]
+}

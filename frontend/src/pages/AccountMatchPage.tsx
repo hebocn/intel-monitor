@@ -37,15 +37,14 @@ const PLATFORM_LABELS: Record<string, string> = { weibo: '微博', x: 'X' }
 
 // ── Subdued tag colors (translucent bg + soft text, low visual weight) ──
 type TagStyle = { bg: string; text: string }
-const TAG: Record<string, TagStyle | ((p: string) => TagStyle)> = {
-  platform: (p: string) => {
-    const c = PLATFORM_COLORS[p] || '#60A5FA'
-    return { bg: `${c}1A`, text: c }               // 10% opacity bg
-  },
+function _tagPlatform(p: string): TagStyle { const c = PLATFORM_COLORS[p] || '#60A5FA'; return { bg: `${c}1A`, text: c } }
+const TAG: Record<string, TagStyle> = {
+  // platform is resolved via resolveTag('platform', p) at call sites
   label:    { bg: 'rgba(34,197,94,0.08)',  text: '#6EE7B7' },   // domain/tone/lang/activity
   keyword:  { bg: 'rgba(20,184,166,0.08)', text: '#5EEAD4' },   // keyword pills
   summary:  { bg: 'rgba(148,163,184,0.06)', text: '#94A3B8' },  // AI summary
 }
+function resolveTag(k: string, p?: string): TagStyle { return k === 'platform' && p ? _tagPlatform(p) : TAG[k] || TAG.label }
 const STATUS_MAP: Record<string, { color: string; icon: any; text: string }> = {
   pending:            { color: '#F59E0B', icon: <ClockCircleOutlined />, text: '等待' },
   searching:          { color: '#60A5FA', icon: <SyncOutlined spin />, text: '搜索中' },
@@ -116,7 +115,7 @@ function CandidateCard({ candidate, result }: { candidate: Candidate; result?: M
         }}>{scorePct}</div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <StyledTag color={TAG.platform(candidate.platform)}>
+        <StyledTag color={resolveTag('platform', candidate.platform)}>
           {PLATFORM_LABELS[candidate.platform] || candidate.platform}
         </StyledTag>
         {candidate.profile_url && (
@@ -496,7 +495,7 @@ export default function AccountMatchPage() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', fontFamily: "'Fira Code', monospace" }}>#{gIdx + 1}</span>
-                                <StyledTag color={TAG.platform(candidate.platform)}>
+                                <StyledTag color={resolveTag('platform', candidate.platform)}>
                                   {PLATFORM_LABELS[candidate.platform] || candidate.platform}
                                 </StyledTag>
                                 <Avatar size={32} src={candidate.avatar_url} icon={<UserOutlined />} />

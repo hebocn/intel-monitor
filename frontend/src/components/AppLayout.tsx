@@ -341,7 +341,22 @@ export default function AppLayout({ children, onLogout }: Props) {
             {currentLabel}
           </div>
 
-          <Dropdown menu={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Button
+              type="text"
+              onClick={() => { window.location.href = '/neo/' }}
+              style={{
+                color: 'rgba(255,255,255,0.55)',
+                fontSize: 13,
+                fontFamily: 'var(--font-body)',
+                letterSpacing: 1,
+                borderRadius: 8,
+              }}
+            >
+              切换风格
+            </Button>
+
+            <Dropdown menu={{
             items: [{
               key: 'logout',
               icon: <LogoutOutlined />,
@@ -359,6 +374,7 @@ export default function AppLayout({ children, onLogout }: Props) {
               <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-primary)' }}>{getUsername()}</span>
             </Button>
           </Dropdown>
+          </div>
         </Header>
 
         <Content style={{
