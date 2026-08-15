@@ -21,6 +21,7 @@ class WebsiteUpdate(BaseModel):
     monitor_interval_minutes: Optional[int] = Field(None, ge=60)
     monitor_hour: Optional[int] = Field(None, ge=0, le=23)
     monitor_minute: Optional[int] = Field(None, ge=0, le=59)
+    push_enabled: Optional[bool] = None
     is_active: Optional[bool] = None
 
 
@@ -32,6 +33,7 @@ class WebsiteResponse(BaseModel):
     monitor_interval_minutes: int
     monitor_hour: int
     monitor_minute: int
+    push_enabled: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime

@@ -130,6 +130,18 @@ OpenCLI → CDP → Playwright，通过 `crawlers/router.py:CrawlerRouter` 统�
 - **数据清理**: 30 天前的 sentiment_tasks 和 posts 自动清理（scheduler 每日 4:07 AM 执行）
 - **平台 MAU 默认值**: 微博 5.86 亿 / 抖音 7.3 亿 / 小红书 3 亿 / 头条 3.5 亿 / 108社区 50 万
 
+## 飞书推送 (Feishu)
+
+通过飞书自建应用机器人实现移动端监测：定时结果推送 + 对话式指令查询。
+
+- **配置**: `.env` 中 `FEISHU_ENABLED=true` + `FEISHU_APP_ID` + `FEISHU_APP_SECRET`；未配置时服务层安全降级（不启动、不推送）
+- **通道**: `services/feishu.py` 用 lark-oapi 长连接（WebSocket）接收消息与卡片回调，无需公网回调 URL
+- **指令**: `/绑定 <验证码>` `/帮助` `/列表` `/结果 <名称>` `/监测 <名称>` `/暂停` `/恢复`
+- **绑定**: Web 端 `系统设置 → 飞书推送` 生成 15 分钟有效验证码（内存存储），`/绑定` 关联 `users.feishu_open_id`
+- **推送**: `monitor.py` 监测成功/失败后调用 `push_monitor_result()`；受 `users.feishu_push_enabled`（全局）+ `targets/website_targets.push_enabled`（目标级）双重开关控制
+- **API**: `/api/feishu/status` `/api/feishu/bind-code` `/api/feishu/unbind`
+- **数据库**: users/targets/website_targets 新列通过 `main.py:_ensure_schema()` 自动迁移
+
 ## 红线
 
 - **数据库迁移**：新增模型字段后需手动 `ALTER TABLE` 添加列（无 Alembic）

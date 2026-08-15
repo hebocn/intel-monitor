@@ -25,6 +25,7 @@ class Target(Base):
     opencli_ready: Mapped[bool] = mapped_column(Boolean, default=False)
     last_verify_status: Mapped[str] = mapped_column(String(20), default="pending")
     last_verify_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

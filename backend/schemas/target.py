@@ -30,6 +30,7 @@ class TargetUpdate(BaseModel):
     post_limit: Optional[int] = Field(None, ge=1, le=100)
     post_time_range_days: Optional[int] = Field(None, ge=0, le=365)
     importance: Optional[str] = Field(None, pattern="^(high|medium|low)$")
+    push_enabled: Optional[bool] = None
     is_active: Optional[bool] = None
 
 
@@ -49,6 +50,7 @@ class TargetResponse(BaseModel):
     opencli_ready: bool
     last_verify_status: str
     last_verify_method: Optional[str]
+    push_enabled: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
