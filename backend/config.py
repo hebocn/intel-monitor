@@ -1,10 +1,11 @@
 # intel-monitor/backend/config.py
 import secrets
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore", env_file=".env", env_file_encoding="utf-8")
     # Active AI provider: minimax / deepseek / mimo
     AI_PROVIDER: str = "minimax"
 
@@ -22,6 +23,11 @@ class Settings(BaseSettings):
     MIMO_API_KEY: str = ""
     MIMO_BASE_URL: str = "https://api.xiaomimimo.com/v1"
     MIMO_MODEL: str = "mimo-v2.5-pro"
+
+    # LM Studio (local, OpenAI-compatible; API key optional placeholder)
+    LMSTUDIO_API_KEY: str = ""
+    LMSTUDIO_BASE_URL: str = "http://localhost:1234/v1"
+    LMSTUDIO_MODEL: str = ""
 
     # Firecrawl
     FIRECRAWL_API_KEY: str = ""
@@ -86,10 +92,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/intel_monitor.db"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()

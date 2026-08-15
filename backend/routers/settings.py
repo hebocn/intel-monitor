@@ -42,6 +42,15 @@ PROVIDERS = {
         "auth_style": "api-key",  # uses api-key header instead of Bearer
         "label": "MiMo",
     },
+    "lmstudio": {
+        "key_env": "LMSTUDIO_API_KEY",
+        "url_env": "LMSTUDIO_BASE_URL",
+        "model_env": "LMSTUDIO_MODEL",
+        "default_url": "http://localhost:1234/v1",
+        "default_model": "minicpm-v-4.6-thinking",
+        "parser": "openai",  # OpenAI-compatible local server
+        "label": "LM Studio",
+    },
     "firecrawl": {
         "key_env": "FIRECRAWL_API_KEY",
         "url_env": "FIRECRAWL_BASE_URL",

@@ -384,7 +384,9 @@ async def get_dashboard_health():
             import httpx
             async with httpx.AsyncClient(timeout=httpx.Timeout(connect=0.5, read=0.3, write=0.3, pool=0.3)) as client:
                 r = await client.get("http://localhost:19825/status")
-                result["opencli_running"] = r.status_code == 200
+                # OpenCLI daemon 对未认证 HTTP 请求返回 403（仅 CLI/扩展带认证），
+                # 收到任何响应即说明 daemon 在运行。
+                result["opencli_running"] = True
         except Exception:
             pass
 
