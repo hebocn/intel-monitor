@@ -18,6 +18,7 @@ from crawlers.router import CrawlerEntry
 # 平台命令映射: platform_key -> (opencli_site, command_name)
 PLATFORM_CMD = {
     "x": ("twitter", "tweets"),
+    "weibo": ("weibo", "user-posts"),
     "xiaohongshu": ("xiaohongshu", "search"),
     "reddit": ("reddit", "hot"),
     "bilibili": ("bilibili", "hot"),
@@ -195,9 +196,50 @@ def _parse_xiaohongshu_posts(data) -> list[PostData]:
     return posts
 
 
+def _parse_weibo_posts(data) -> list[PostData]:
+    """解析 opencli weibo user-posts 输出（正文/转发/评论/点赞/链接）。"""
+    posts = []
+    items = data if isinstance(data, list) else [data]
+    for item in items:
+        try:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text", "") or ""
+            url = item.get("url", "") or ""
+            likes = int(item.get("likes", 0) or 0)
+            comments_count = int(item.get("comments", 0) or 0)
+            shares = int(item.get("reposts", 0) or 0)
+            author = item.get("author", "") or ""
+            uid = item.get("uid", "") or ""
+            published_at = None
+            time_str = item.get("time", "") or ""
+            if time_str:
+                try:
+                    from datetime import datetime
+                    # 微博时间格式: "Wed Jul 15 18:57:47 +0800 2026" 或类似
+                    for fmt in ("%a %b %d %H:%M:%S %z %Y", "%a %b %d %H:%M:%S %Y"):
+                        try:
+                            published_at = datetime.strptime(time_str, fmt).replace(tzinfo=None)
+                            break
+                        except ValueError:
+                            continue
+                except Exception:
+                    pass
+            posts.append(PostData(
+                url=url, content=text, title=text[:80],
+                likes=likes, comments_count=comments_count, shares=shares,
+                author_name=author,
+                published_at=published_at, images=[],
+            ))
+        except Exception:
+            continue
+    return posts
+
+
 def _parse_posts(platform: str, data) -> list[PostData]:
     parsers = {
         "x": _parse_twitter_posts,
+        "weibo": _parse_weibo_posts,
         "xiaohongshu": _parse_xiaohongshu_posts,
         "reddit": _parse_reddit_posts,
         "bilibili": _parse_bilibili_posts,
@@ -236,9 +278,12 @@ async def _run_opencli(platform: str, username_or_query: str, limit: int = 10, i
         args = [site, "search", username_or_query]
     else:
         args = [site, cmd]
-        if platform in ("x", "xiaohongshu"):
+        if platform in ("x", "weibo", "xiaohongshu"):
             args.append(username_or_query)
     args.extend(["--limit", str(limit), "--format", "json"])
+
+    # 大条数抓取需要更长超时：粗估每条约 0.3s（X 分页含 2s/页节流），上限 900s
+    subprocess_timeout = min(900, max(120, int(limit * 0.3)))
 
     def _run_subprocess():
         """Run opencli in a thread to avoid event loop subprocess issues on Windows."""
@@ -246,7 +291,7 @@ async def _run_opencli(platform: str, username_or_query: str, limit: int = 10, i
             result = _sp.run(
                 [opencli_path] + args,
                 capture_output=True,
-                timeout=90,
+                timeout=subprocess_timeout,
             )
             return result.stdout, result.stderr, result.returncode
         except _sp.TimeoutExpired:

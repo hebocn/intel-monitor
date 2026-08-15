@@ -72,6 +72,8 @@ export const scheduleAPI = {
   refresh: () => api.post('/schedule/refresh'),
   runNow: (targetId: number, targetType: string) =>
     api.post(`/schedule/run/${targetId}`, null, { params: { target_type: targetType } }),
+  sync: (targetId: number, limit: number) =>
+    api.post(`/schedule/sync/${targetId}`, null, { params: { limit }, timeout: 600000 }),
 }
 
 // Feishu

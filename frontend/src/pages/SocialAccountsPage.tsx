@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton } from 'antd'
+import { Button, Modal, Drawer, Segmented, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, LinkOutlined, PauseCircleOutlined,
-  CheckCircleOutlined, SettingOutlined,
+  CheckCircleOutlined, SettingOutlined, SyncOutlined, DownloadOutlined, LoadingOutlined,
 } from '@ant-design/icons'
 import { targetsAPI, scheduleAPI, resultsAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
@@ -32,7 +32,9 @@ const platformMap = Object.fromEntries(platformOptions.map(p => [p.value, p]))
 function AccountCard({
   target,
   running,
+  syncing,
   onRun,
+  onSync,
   onEdit,
   onDelete,
   onDetail,
@@ -40,7 +42,9 @@ function AccountCard({
 }: {
   target: any
   running: boolean
+  syncing: boolean
   onRun: () => void
+  onSync: () => void
   onEdit: () => void
   onDelete: () => void
   onDetail: () => void
@@ -147,6 +151,18 @@ function AccountCard({
               style={{ color: '#0f766e' }}
             />
           </Tooltip>
+          {(target.platform === 'x' || target.platform === 'weibo') && (
+            <Tooltip title="同步（拉取正文存档，可选条数）">
+              <Button
+                type="text"
+                size="small"
+                icon={<SyncOutlined />}
+                onClick={onSync}
+                loading={syncing}
+                style={{ color: '#3370ff' }}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="编辑">
             <Button type="text" size="small" icon={<EditOutlined />} onClick={onEdit} />
           </Tooltip>
@@ -233,6 +249,14 @@ export default function SocialAccountsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState<any>(null)
   const [runningId, setRunningId] = useState<number | null>(null)
+  const [syncingId, setSyncingId] = useState<number | null>(null)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
+  const [syncTarget, setSyncTarget] = useState<any>(null)
+  const [syncLimit, setSyncLimit] = useState<number>(200)
+  const [syncDrawerOpen, setSyncDrawerOpen] = useState(false)
+  const [syncPosts, setSyncPosts] = useState<any[] | null>(null)
+  const [syncSyncedAt, setSyncSyncedAt] = useState<string | null>(null)
+  const [syncElapsed, setSyncElapsed] = useState(0)
   const [form] = Form.useForm()
   const navigate = useNavigate()
   const [scheduleMode, setScheduleMode] = useState<'simple' | 'cron'>('simple')
@@ -249,6 +273,12 @@ export default function SocialAccountsPage() {
   }
 
   useEffect(() => { fetchTargets() }, [])
+
+  useEffect(() => {
+    if (syncingId == null) return
+    const timer = setInterval(() => setSyncElapsed(prev => prev + 1), 1000)
+    return () => clearInterval(timer)
+  }, [syncingId])
 
   const handleSubmit = async () => {
     let values: any
@@ -297,6 +327,135 @@ export default function SocialAccountsPage() {
       }
     }
   }
+
+  const openSyncModal = (target: any) => {
+    setSyncTarget(target)
+    setSyncLimit(200)
+    setSyncModalOpen(true)
+  }
+
+  const handleSync = async () => {
+    if (!syncTarget) return
+    const limit = syncLimit
+    setSyncingId(syncTarget.id)
+    setSyncElapsed(0)
+    try {
+      const res = await scheduleAPI.sync(syncTarget.id, limit)
+      const { result_id, status, error_message } = res.data
+      if (status === 'failed') {
+        message.error(error_message || '同步失败')
+        setSyncModalOpen(false)
+        setSyncingId(null)
+        return
+      }
+      const detailRes = await resultsAPI.detail(result_id)
+      const result = detailRes.data
+      let posts: any[] = []
+      if (result.raw_content) {
+        try { posts = JSON.parse(result.raw_content) } catch {}
+      }
+      setSyncPosts(posts)
+      setSyncSyncedAt(result.created_at || null)
+      setSyncModalOpen(false)
+      setSyncDrawerOpen(true)
+      message.success(`同步完成：${posts.length} 条`)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '同步失败')
+      setSyncModalOpen(false)
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  const buildMarkdown = (posts: any[], target: any) => {
+    const plat = platformMap[target.platform]?.label || target.platform
+    const now = new Date().toLocaleString('zh-CN', { hour12: false })
+    const lines: string[] = [
+      `# 账号同步存档：${plat} @${target.account_name}`,
+      '',
+      `- 平台：${plat}`,
+      `- 账号：${target.account_name}`,
+      `- 账号链接：${target.account_url}`,
+      `- 同步时间：${now}`,
+      `- 条数：${posts.length}`,
+      '',
+      '---',
+      '',
+    ]
+    posts.forEach((p: any, i: number) => {
+      const timeTitle = fmtPostTime(p.published_at)
+      lines.push(`## ${i + 1}. ${timeTitle || p.title || '(无时间)'}`, '')
+      const meta: string[] = []
+      if (p.author_name) meta.push(`作者：${p.author_name}`)
+      if (p.published_at) meta.push(`时间：${new Date(p.published_at).toLocaleString('zh-CN', { hour12: false })}`)
+      if (p.likes) meta.push(`点赞：${p.likes}`)
+      if (p.comments_count) meta.push(`评论：${p.comments_count}`)
+      if (p.shares) meta.push(`转发：${p.shares}`)
+      if (p.views) meta.push(`浏览：${p.views}`)
+      if (meta.length) lines.push(`> ${meta.join(' | ')}`, '')
+      lines.push(p.content || '', '')
+      if (p.url) lines.push(`> 链接：${p.url}`, '')
+      if (Array.isArray(p.images) && p.images.length) {
+        p.images.forEach((img: string) => lines.push(`![图片](${img})`))
+        lines.push('')
+      }
+      lines.push('---', '')
+    })
+    return lines.join('\n')
+  }
+
+  const handleExportMd = () => {
+    if (!syncPosts?.length || !syncTarget) return
+    const md = buildMarkdown(syncPosts, syncTarget)
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sync-${syncTarget.account_name || 'account'}-${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('已导出 Markdown')
+  }
+
+  const buildNDJSON = (posts: any[]) => posts.map(p => JSON.stringify(p)).join('\n')
+
+  const handleExportNdjson = () => {
+    if (!syncPosts?.length || !syncTarget) return
+    const blob = new Blob([buildNDJSON(syncPosts)], { type: 'application/x-ndjson;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sync-${syncTarget.account_name || 'account'}-${new Date().toISOString().slice(0, 10)}.ndjson`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('已导出 NDJSON')
+  }
+
+  // 帖子 ID：X 取 /status/<id>，微博取 URL 末段
+  const extractPostId = (p: any) => {
+    const u = p.url || ''
+    const m = u.match(/\/status\/([^/?#]+)/)
+    if (m) return m[1]
+    const seg = u.split('/').filter(Boolean).pop()
+    return seg || ''
+  }
+
+  const fmtPostTime = (iso?: string) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  const syncRange = (() => {
+    if (!syncPosts?.length) return { earliest: '-', latest: '-' }
+    const times = syncPosts.map(p => p.published_at).filter(Boolean).sort()
+    const fmt = (t: string) => t ? new Date(t).toLocaleDateString('zh-CN') : '-'
+    return {
+      earliest: times.length ? fmt(times[0]) : '-',
+      latest: times.length ? fmt(times[times.length - 1]) : '-',
+    }
+  })()
 
   const handleDelete = async (id: number) => {
     await targetsAPI.delete(id)
@@ -403,7 +562,9 @@ export default function SocialAccountsPage() {
               key={target.id}
               target={target}
               running={runningId === target.id}
+              syncing={syncingId === target.id}
               onRun={() => handleRunNow(target.id)}
+              onSync={() => openSyncModal(target)}
               onEdit={() => openEditModal(target)}
               onDelete={() => handleDelete(target.id)}
               onDetail={() => navigate(`/detail/social_media/${target.id}`)}
@@ -412,6 +573,209 @@ export default function SocialAccountsPage() {
           ))}
         </div>
       )}
+
+      {/* Sync limit modal — 按参考图设计 */}
+      <Modal
+        open={syncModalOpen}
+        onCancel={() => setSyncModalOpen(false)}
+        width={440}
+        footer={null}
+        centered
+      >
+        <div style={{ padding: '8px 4px 0 4px' }}>
+          <Text style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: 22 }}>
+            同步 {platformMap[syncTarget?.platform]?.label || ''}账号
+          </Text>
+
+          {/* Account */}
+          <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+            账号
+          </Text>
+          <Text style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: 22 }}>
+            @{syncTarget?.account_name}
+          </Text>
+
+          {/* Count selector */}
+          <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 10 }}>
+            抓取条数
+          </Text>
+          <Segmented
+            block
+            value={syncLimit}
+            onChange={v => setSyncLimit(v as number)}
+            options={[
+              { label: '200', value: 200 },
+              { label: '1.0k', value: 1000 },
+              { label: '5.0k', value: 5000 },
+              { label: '全部', value: 10000 },
+            ]}
+            style={{ width: '100%' }}
+          />
+
+          {/* Custom count input */}
+          <InputNumber
+            min={1} max={10000}
+            value={syncLimit}
+            onChange={v => { if (v != null) setSyncLimit(v) }}
+            controls={false}
+            bordered={false}
+            style={{
+              fontSize: 30, fontWeight: 700, color: 'var(--text-primary)',
+              width: '100%', margin: '14px 0 10px 0', height: 40,
+            }}
+            placeholder="输入抓取条数 (1-10000)"
+          />
+          <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', lineHeight: 1.7, marginBottom: 26 }}>
+            最新 N 条帖子（1-10,000）。较大的同步会分页抓取，并在请求之间短暂间隔以降低限流风险。
+          </Text>
+
+          {/* Progress */}
+          {syncingId !== null && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 18, padding: '10px 14px', borderRadius: 10,
+              background: 'rgba(51,112,255,0.06)', border: '1px solid rgba(51,112,255,0.2)',
+              color: 'var(--text-secondary)', fontSize: 13,
+            }}>
+              <LoadingOutlined spin style={{ color: '#3370ff' }} />
+              <span>
+                正在同步 @{syncTarget?.account_name}，抓取 {syncLimit} 条帖子... 已等待 {syncElapsed} 秒
+              </span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button disabled={syncingId !== null} onClick={() => setSyncModalOpen(false)}>取消</Button>
+            <Button type="primary" loading={syncingId !== null} onClick={handleSync}>开始同步</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Sync result drawer — 按参考图设计 */}
+      <Drawer
+        open={syncDrawerOpen}
+        onClose={() => setSyncDrawerOpen(false)}
+        width={800}
+      >
+        {syncTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Header: 账号 + 条数 + 同步/浏览 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 14,
+            }}>
+              <Text style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                @{syncTarget.account_name}{' '}
+                <Text type="secondary" style={{ fontSize: 14, fontWeight: 400 }}>
+                  {syncPosts?.length ?? 0} 条帖子
+                </Text>
+              </Text>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button
+                  size="small" icon={<SyncOutlined />}
+                  loading={syncingId === syncTarget.id}
+                  onClick={() => openSyncModal(syncTarget)}
+                >
+                  同步
+                </Button>
+                <Button
+                  size="small" icon={<SettingOutlined />}
+                  onClick={() => navigate(`/detail/social_media/${syncTarget.id}`)}
+                >
+                  浏览
+                </Button>
+              </div>
+            </div>
+
+            {/* Info row: 最早 / 最新 / 上次同步 */}
+            <div style={{
+              display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap',
+              color: 'var(--text-muted)', fontSize: 13,
+            }}>
+              <span>最早：{syncRange.earliest}</span>
+              <span>最新：{syncRange.latest}</span>
+              <span>上次同步:{(syncSyncedAt || '').replace(/-/g, '/') || '-'}</span>
+            </div>
+
+            {/* Export row */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+              <Button icon={<DownloadOutlined />} onClick={handleExportNdjson} disabled={!syncPosts?.length}>
+                导出为 NDJSON
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={handleExportMd} disabled={!syncPosts?.length}>
+                导出为 Markdown
+              </Button>
+            </div>
+
+            {/* Recent posts */}
+            <Text style={{
+              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+              marginBottom: 12, display: 'block',
+            }}>
+              最近帖子
+            </Text>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
+              {!syncPosts?.length ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                  暂无内容
+                </div>
+              ) : syncPosts.map((p: any, i: number) => (
+                <div key={i} style={{
+                  background: 'var(--surface-1)', border: '1px solid var(--border)',
+                  borderRadius: 12, padding: 14,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {fmtPostTime(p.published_at)}
+                    </Text>
+                    {extractPostId(p) && (
+                      <Tag style={{
+                        fontSize: 11, margin: 0, fontFamily: 'var(--font-mono)',
+                        background: 'rgba(51,112,255,0.08)', border: '1px solid rgba(51,112,255,0.2)',
+                        color: '#3370ff',
+                      }}>
+                        {extractPostId(p)}
+                      </Tag>
+                    )}
+                  </div>
+                  <div style={{
+                    color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {p.content}
+                  </div>
+                  {p.url && (
+                    <a href={p.url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 12, display: 'block', marginTop: 8, wordBreak: 'break-all', color: '#3370ff' }}>
+                      {p.url}
+                    </a>
+                  )}
+                  <div style={{
+                    display: 'flex', gap: 16, marginTop: 8,
+                    color: 'var(--text-muted)', fontSize: 12,
+                  }}>
+                    <span>点赞 {p.likes ?? 0}</span>
+                    <span>评论 {p.comments_count ?? 0}</span>
+                    <span>转发 {p.shares ?? 0}</span>
+                    <span>浏览 {p.views ?? 0}</span>
+                  </div>
+                  {Array.isArray(p.images) && p.images.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                      {p.images.map((img: string, j: number) => (
+                        <img key={j} src={img} alt="" style={{
+                          width: 96, height: 96, objectFit: 'cover', borderRadius: 8,
+                          border: '1px solid var(--border)',
+                        }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       {/* Add/Edit modal */}
       <Modal

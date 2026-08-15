@@ -10,6 +10,17 @@ from database import get_db
 from auth import get_current_user
 from models.user import User
 from models.result import MonitorResult
+
+
+def _parse_posts_count(raw_content: str | None) -> int | None:
+    if not raw_content:
+        return None
+    import json
+    try:
+        posts = json.loads(raw_content)
+        return len(posts) if isinstance(posts, list) else None
+    except Exception:
+        return None
 from models.comment import HotComment
 from schemas.result import ResultResponse, ResultDetailResponse, HotCommentResponse
 from services.monitor import fetch_post_comments
@@ -39,7 +50,10 @@ async def list_results(
         query = query.where(MonitorResult.status == result_status)
     query = query.order_by(MonitorResult.created_at.desc()).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    items = result.scalars().all()
+    for item in items:
+        item.posts_count = _parse_posts_count(item.raw_content)
+    return items
 
 
 @router.get("/{result_id}", response_model=ResultDetailResponse)

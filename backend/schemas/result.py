@@ -32,6 +32,7 @@ class ResultResponse(BaseModel):
     crawl_method: Optional[str] = None
     comments_ai_status: str = "idle"
     created_at: datetime
+    posts_count: Optional[int] = None
 
     model_config = {"from_attributes": True}
 

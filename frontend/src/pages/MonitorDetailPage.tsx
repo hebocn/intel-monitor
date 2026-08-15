@@ -4,11 +4,81 @@ import { Tag, Typography, Empty, Select, Popconfirm, message, Image, Tooltip, Sk
 import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   DeleteOutlined, FilterOutlined, RobotOutlined, FileTextOutlined,
-  HeartOutlined, CommentOutlined, LoadingOutlined,
+  HeartOutlined, CommentOutlined, LoadingOutlined, DownloadOutlined,
 } from '@ant-design/icons'
 import { resultsAPI } from '../services/api'
 
 const { Text } = Typography
+
+// 同步记录：从 raw_content 解析帖子数量；非同步记录返回 null
+function countSyncedPosts(raw: string | null | undefined): number | null {
+  if (!raw) return null
+  try {
+    const posts = JSON.parse(raw)
+    return Array.isArray(posts) ? posts.length : null
+  } catch {
+    return null
+  }
+}
+
+// 帖子 ID：X 取 /status/<id>，微博取 URL 末段
+function extractPostId(url: string): string {
+  const m = (url || '').match(/\/status\/([^/?#]+)/)
+  if (m) return m[1]
+  const seg = (url || '').split('/').filter(Boolean).pop()
+  return seg || ''
+}
+
+function fmtPostTime(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function downloadText(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function buildMarkdown(posts: any[], record: any): string {
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const lines: string[] = [
+    `# 同步存档：${record.target_type} 记录 #${record.id}`,
+    '',
+    `- 监测日期：${record.monitor_date}`,
+    `- 同步时间：${now}`,
+    `- 条数：${posts.length}`,
+    '',
+    '---',
+    '',
+  ]
+  posts.forEach((p: any, i: number) => {
+    const timeTitle = fmtPostTime(p.published_at)
+    lines.push(`## ${i + 1}. ${timeTitle || p.title || '(无时间)'}`, '')
+    const meta: string[] = []
+    if (p.author_name) meta.push(`作者：${p.author_name}`)
+    if (p.published_at) meta.push(`时间：${fmtPostTime(p.published_at)}`)
+    if (p.likes) meta.push(`点赞：${p.likes}`)
+    if (p.comments_count) meta.push(`评论：${p.comments_count}`)
+    if (p.shares) meta.push(`转发：${p.shares}`)
+    if (p.views) meta.push(`浏览：${p.views}`)
+    if (meta.length) lines.push(`> ${meta.join(' | ')}`, '')
+    lines.push(p.content || '', '')
+    if (p.url) lines.push(`> 链接：${p.url}`, '')
+    if (Array.isArray(p.images) && p.images.length) {
+      p.images.forEach((img: string) => lines.push(`![图片](${img})`))
+      lines.push('')
+    }
+    lines.push('---', '')
+  })
+  return lines.join('\n')
+}
 
 function cleanSummary(text: string | null | undefined): string {
   if (!text) return ''
@@ -120,7 +190,9 @@ function ResultCard({
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             flex: 1,
           }}>
-            {cleaned ? cleaned.slice(0, 80) + (cleaned.length > 80 ? '...' : '') : '暂无总结'}
+            {cleaned
+              ? cleaned.slice(0, 80) + (cleaned.length > 80 ? '...' : '')
+              : (record.posts_count != null ? `已同步${record.posts_count}条帖子` : '暂无总结')}
           </Text>
         </div>
 
@@ -272,6 +344,38 @@ export default function MonitorDetailPage() {
     return () => clearInterval(timer)
   }, [selectedResult?.id, selectedResult?.comments_ai_status])
 
+  const handleExportMd = () => {
+    if (!selectedResult?.raw_content) return
+    try {
+      const posts = JSON.parse(selectedResult.raw_content)
+      if (!Array.isArray(posts)) return
+      downloadText(
+        buildMarkdown(posts, selectedResult),
+        `record-${selectedResult.id}-${selectedResult.monitor_date}.md`,
+        'text/markdown;charset=utf-8',
+      )
+      message.success('已导出 Markdown')
+    } catch {
+      message.error('导出失败')
+    }
+  }
+
+  const handleExportNdjson = () => {
+    if (!selectedResult?.raw_content) return
+    try {
+      const posts = JSON.parse(selectedResult.raw_content)
+      if (!Array.isArray(posts)) return
+      downloadText(
+        posts.map(p => JSON.stringify(p)).join('\n'),
+        `record-${selectedResult.id}-${selectedResult.monitor_date}.ndjson`,
+        'application/x-ndjson;charset=utf-8',
+      )
+      message.success('已导出 NDJSON')
+    } catch {
+      message.error('导出失败')
+    }
+  }
+
   const handleDelete = async (resultId: number) => {
     try {
       await resultsAPI.delete(resultId)
@@ -389,6 +493,19 @@ export default function MonitorDetailPage() {
             }}>
               {selectedResult.monitor_date}
             </Tag>
+            {selectedResult.created_at && (
+              <Text style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+                同步时间：{selectedResult.created_at}
+              </Text>
+            )}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <Button size="small" icon={<DownloadOutlined />} onClick={handleExportNdjson}>
+                NDJSON
+              </Button>
+              <Button size="small" icon={<DownloadOutlined />} onClick={handleExportMd}>
+                Markdown
+              </Button>
+            </div>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '2px 10px', borderRadius: 10,
@@ -436,6 +553,21 @@ export default function MonitorDetailPage() {
                         borderRadius: 14,
                         border: '1px solid var(--border)',
                       }}>
+                        {/* 时间 + ID */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+                          <Text type="secondary" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                            {fmtPostTime(post.published_at)}
+                          </Text>
+                          {extractPostId(post.url) && (
+                            <Tag style={{
+                              fontSize: 11, margin: 0, fontFamily: 'var(--font-mono)',
+                              background: 'rgba(51,112,255,0.08)', border: '1px solid rgba(51,112,255,0.2)',
+                              color: '#3370ff',
+                            }}>
+                              {extractPostId(post.url)}
+                            </Tag>
+                          )}
+                        </div>
                         {/* 作者头像 + 名字 */}
                         {(post.author_name || post.author_avatar) && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
