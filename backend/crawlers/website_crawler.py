@@ -16,6 +16,35 @@ class WebsiteCrawler:
     3. Playwright (headless, basic sites)
     """
 
+    @staticmethod
+    def _filter_images(images: list[str], max_images: int = 5) -> list[str]:
+        """去重 + 过滤装饰图/logo/图标/空白像素, 只保留有分析价值的内容图."""
+        if not images:
+            return []
+        seen: set[str] = set()
+        result: list[str] = []
+        # 常见装饰图文件名/路径特征 (logo/icon/banner/背景/空白)
+        deco_patterns = (
+            "logo", "icon", "banner", "sprite", "avatar", "default",
+            "placeholder", "spacer", "blank", "transparent", "loading",
+            "title.gif", "top.jpg", "index.gif", "11.jpg", "1x1", "pixel",
+            ".svg", "favicon", "logo_", "_logo", "logo.", "weixin", "qrcode",
+        )
+        for u in images:
+            if not u or u in seen:
+                continue
+            low = u.lower()
+            if any(p in low for p in deco_patterns):
+                continue
+            # 只保留常见图片格式
+            if not any(ext in low for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")):
+                continue
+            seen.add(u)
+            result.append(u)
+            if len(result) >= max_images:
+                break
+        return result
+
     async def crawl(self, url: str, css_selector: str | None = None) -> CrawlResult:
         # Chain 1: Scrapling
         try:
@@ -59,9 +88,15 @@ class WebsiteCrawler:
                     f"() => document.querySelector('{css_selector}') ? "
                     f"document.querySelector('{css_selector}').innerText : ''"
                 )
+                extracted["images"] = page.evaluate(
+                    f"() => Array.from(document.querySelectorAll('{css_selector} img')).map(i => i.src || i.getAttribute('data-src')).filter(u => u && u.startsWith('http'))"
+                )
             else:
                 extracted["body"] = page.evaluate(
                     "() => document.body ? document.body.innerText.substring(0, 10000) : ''"
+                )
+                extracted["images"] = page.evaluate(
+                    "() => Array.from(document.querySelectorAll('article img, .content img, .article img, .entry-content img, main img, img')).map(i => i.src || i.getAttribute('data-src')).filter(u => u && u.startsWith('http')).slice(0, 8)"
                 )
             return None
 
@@ -90,7 +125,8 @@ class WebsiteCrawler:
             return CrawlResult(success=False, error_message=f"被反爬拦截: {body[:200]}")
 
         return CrawlResult(
-            posts=[PostData(url=extracted.get("url", url), title=title, content=body[:5000])],
+            posts=[PostData(url=extracted.get("url", url), title=title, content=body[:5000],
+                            images=self._filter_images(extracted.get("images") or []))],
             raw_html=body[:10000],
             success=True,
         )
@@ -151,13 +187,21 @@ class WebsiteCrawler:
 
             if css_selector:
                 content = await pw.page.inner_text(css_selector)
+                images = await pw.page.eval_on_selector_all(
+                    f"{css_selector} img",
+                    "els => els.map(i => i.src || i.getAttribute('data-src')).filter(u => u && u.startsWith('http'))",
+                )
             else:
                 content = await pw.page.inner_text("body")
+                images = await pw.page.eval_on_selector_all(
+                    "article img, .content img, .article img, .entry-content img, main img, img",
+                    "els => els.map(i => i.src || i.getAttribute('data-src')).filter(u => u && u.startsWith('http')).slice(0, 8)",
+                )
 
             title = await pw.page.title()
 
             return CrawlResult(
-                posts=[PostData(url=url, title=title, content=content[:5000])],
+                posts=[PostData(url=url, title=title, content=content[:5000], images=self._filter_images(images))],
                 raw_html=content[:10000],
                 success=True,
             )

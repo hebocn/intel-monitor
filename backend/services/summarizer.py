@@ -20,6 +20,10 @@ _PROVIDER_CONFIGS = {
         "key_env": "MIMO_API_KEY", "url_env": "MIMO_BASE_URL", "model_env": "MIMO_MODEL",
         "default_url": "https://api.xiaomimimo.com/v1", "parser": "openai", "auth_style": "api-key",
     },
+    "lmstudio": {
+        "key_env": "LMSTUDIO_API_KEY", "url_env": "LMSTUDIO_BASE_URL", "model_env": "LMSTUDIO_MODEL",
+        "default_url": "http://localhost:1234/v1", "parser": "openai",
+    },
 }
 
 
@@ -58,6 +62,28 @@ class ContentSummarizer:
 
         return api_key, api_url, model, parser, auth_style
 
+    async def _prepare_image_url(self, provider: str, url: str) -> str:
+        """Convert an image URL to base64 data URL for local servers (LM Studio)
+        that don't accept remote image URLs. Cloud providers keep the URL as-is."""
+        if provider != "lmstudio":
+            return url
+        try:
+            # 微博 CDN 等有防盗链，添加 Referer 头
+            headers = {
+                "Referer": "https://weibo.com/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            }
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+            mime = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+            import base64
+            b64 = base64.b64encode(resp.content).decode()
+            return f"data:{mime};base64,{b64}"
+        except Exception as e:
+            logger.warning(f"[summarizer] 图片转 base64 失败 ({url[:80]}): {e}")
+            return url  # 回退原 URL，让上游报错
+
     async def _call_provider(self, provider: str, api_key: str, api_url: str, model: str,
                               parser: str, auth_style: str, system_prompt: str,
                               user_prompt: str, images: list[str] | None = None) -> str:
@@ -65,6 +91,7 @@ class ContentSummarizer:
         if images:
             content = [{"type": "text", "text": user_prompt}]
             for url in images:
+                url = await self._prepare_image_url(provider, url)
                 content.append({"type": "image_url", "image_url": {"url": url}})
             user_message = {"role": "user", "content": content}
         else:
@@ -196,7 +223,7 @@ class ContentSummarizer:
                 return posts_text[:2000]
             return f"总结生成失败: {msg}"
 
-    async def summarize_website(self, site_name: str, content: str) -> str:
+    async def summarize_website(self, site_name: str, content: str, images: list[str] | None = None) -> str:
         if not content:
             return "今日无内容变化。"
 
@@ -204,7 +231,7 @@ class ContentSummarizer:
         user_prompt = f"网站: {site_name}\n内容:\n{content[:5000]}"
 
         try:
-            return await self._call_ai(system_prompt, user_prompt)
+            return await self._call_ai(system_prompt, user_prompt, images=images or None)
         except Exception as e:
             msg = str(e)
             # If all providers rejected due to content policy, output raw content as summary

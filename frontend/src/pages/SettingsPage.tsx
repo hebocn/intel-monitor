@@ -13,6 +13,7 @@ const aiProviders = [
   { key: 'minimax', label: 'MiniMax', color: '#A78BFA', desc: 'MiniMax-M2.7 · 多模态' },
   { key: 'deepseek', label: 'DeepSeek', color: '#3B82F6', desc: 'deepseek-chat · 推理能力强' },
   { key: 'mimo', label: 'MiMo', color: '#e11d48', desc: 'MiMo-V2.5-Pro · 小米大模型' },
+  { key: 'lmstudio', label: 'LM Studio', color: '#10b981', desc: '本地模型 · minicpm-v-4.6-thinking · 视觉多模态' },
 ]
 
 // Service providers — API key only, not LLM models
@@ -323,6 +324,7 @@ export default function SettingsPage() {
     minimax: { ...defaultState },
     deepseek: { ...defaultState },
     mimo: { ...defaultState },
+    lmstudio: { ...defaultState },
     firecrawl: { ...defaultState },
     tavily: { ...defaultState },
     youtube: { ...defaultState },

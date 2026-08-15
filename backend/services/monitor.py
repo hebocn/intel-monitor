@@ -186,7 +186,8 @@ async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
             return
 
         content = crawl_result.posts[0].content if crawl_result.posts else ""
-        summary = await summarizer.summarize_website(target.name, content)
+        images = crawl_result.posts[0].images if crawl_result.posts else []
+        summary = await summarizer.summarize_website(target.name, content, images=images)
 
         monitor_result.summary = summary
         monitor_result.raw_content = content[:10000]

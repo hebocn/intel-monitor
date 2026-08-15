@@ -29,7 +29,9 @@ def opencli_status():
         try:
             import httpx
             r = httpx.get("http://localhost:19825/status", timeout=3)
-            daemon_running = r.status_code == 200
+            # OpenCLI daemon 对未认证 HTTP 请求返回 403（仅 CLI/扩展带认证），
+            # 因此只要收到任何 HTTP 响应（含 4xx）即说明 daemon 在运行。
+            daemon_running = True
         except Exception:
             pass
 

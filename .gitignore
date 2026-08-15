@@ -7,6 +7,7 @@ node_modules/
 dist/
 .vite/
 *.db
+*.log
 .gstack/
 .agents/
 skills-lock.json
