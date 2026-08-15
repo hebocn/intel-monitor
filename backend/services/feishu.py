@@ -436,8 +436,31 @@ async def _latest_result(db, target_id: int, target_type: str):
     return result.scalars().first()
 
 
+_PLATFORM_ALIASES = {
+    "x": ["x", "twitter", "推特", "x(twitter)"],
+    "weibo": ["weibo", "微博", "新浪微博"],
+    "douyin": ["douyin", "抖音"],
+    "xiaohongshu": ["xiaohongshu", "xhs", "小红书"],
+    "youtube": ["youtube", "yt", "油管", "youtube视频"],
+    "toutiao": ["toutiao", "头条", "今日头条"],
+    "108community": ["108community", "108", "108社区", "108天台", "天台社区"],
+}
+
+
+def _match_platform(alias: str) -> str | None:
+    """把平台别名/中文名解析为平台 key（如 'X'/'推特'/'微博' -> 平台 key）。"""
+    alias = alias.strip().lower().lstrip("@")
+    for plat, aliases in _PLATFORM_ALIASES.items():
+        if alias == plat or alias in aliases:
+            return plat
+    return None
+
+
 async def _resolve_target(user, query: str):
-    """按 platform / 名称 / 序号解析目标。返回 (target_type, target_id, display_name) 或 None。"""
+    """解析目标。支持：平台名、账号名、序号、'平台 账号名'/'平台@账号名' 复合写法。
+
+    返回 (target_type, target_id, display_name) 或 None。
+    """
     from database import async_session
     from models.target import Target
     from models.website import WebsiteTarget
@@ -466,6 +489,21 @@ async def _resolve_target(user, query: str):
         for w in websites:
             if q_lower in w.name.lower():
                 return "website", w.id, w.name
+
+        # '平台 账号名' 或 '平台@账号名' 复合写法：解析平台 + 按账号名匹配
+        import re
+        m = re.match(r"^([^\s@]+)[\s@]*@?\s*(.+)$", query)
+        if m:
+            plat = _match_platform(m.group(1))
+            if plat is not None:
+                name_part = m.group(2).strip().lstrip("@").strip()
+                if name_part:
+                    for t in targets:
+                        if t.platform == plat and (
+                            name_part.lower() in t.account_name.lower()
+                            or t.account_name.lower() in name_part.lower()
+                        ):
+                            return "social_media", t.id, _PLATFORM_NAMES.get(t.platform, t.platform) + " @" + t.account_name
     return None
 
 
