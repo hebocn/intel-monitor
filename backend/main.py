@@ -17,8 +17,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db, engine
-from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match
+from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu
 from services.scheduler import setup_scheduler, refresh_jobs
+from services.feishu import start_feishu_client, stop_feishu_client
 
 
 async def _ensure_schema():
@@ -141,6 +142,26 @@ async def _ensure_schema():
             "SELECT retweet_count FROM hot_comments LIMIT 0",
             "ALTER TABLE hot_comments ADD COLUMN retweet_count INTEGER DEFAULT 0",
         ),
+        (
+            "users_feishu_open_id",
+            "SELECT feishu_open_id FROM users LIMIT 0",
+            "ALTER TABLE users ADD COLUMN feishu_open_id VARCHAR(64)",
+        ),
+        (
+            "users_feishu_push_enabled",
+            "SELECT feishu_push_enabled FROM users LIMIT 0",
+            "ALTER TABLE users ADD COLUMN feishu_push_enabled BOOLEAN DEFAULT 1",
+        ),
+        (
+            "targets_push_enabled",
+            "SELECT push_enabled FROM targets LIMIT 0",
+            "ALTER TABLE targets ADD COLUMN push_enabled BOOLEAN DEFAULT 1",
+        ),
+        (
+            "website_targets_push_enabled",
+            "SELECT push_enabled FROM website_targets LIMIT 0",
+            "ALTER TABLE website_targets ADD COLUMN push_enabled BOOLEAN DEFAULT 1",
+        ),
     ]
 
     async with engine.begin() as conn:
@@ -163,7 +184,9 @@ async def lifespan(app: FastAPI):
     await _ensure_schema()
     setup_scheduler()
     await refresh_jobs()
+    start_feishu_client()
     yield
+    stop_feishu_client()
 
 
 app = FastAPI(title="Intel Monitor", lifespan=lifespan)
@@ -181,6 +204,8 @@ app.include_router(hot_topics.router)
 app.include_router(sentiment.router)
 app.include_router(intelligence.router)
 app.include_router(account_match.router)
+app.include_router(weather.router)
+app.include_router(feishu.router)
 
 # Serve frontend static files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
@@ -198,4 +223,8 @@ if frontend_dist.exists():
 if __name__ == "__main__":
     import uvicorn
     from config import settings
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)
+    uvicorn.run(
+        "main:app", host=settings.HOST, port=settings.PORT, reload=True,
+        # 排除 tests/data/缓存目录，避免测试或数据变化触发 reload 丢失内存态（如飞书绑定码）
+        reload_excludes=["tests*", "data*", "*.pyc", "__pycache__*"],
+    )

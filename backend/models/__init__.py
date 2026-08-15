@@ -12,10 +12,12 @@ from models.platform_stats import PlatformStats
 from models.intelligence_category import IntelligenceCategory
 from models.intelligence_report import IntelligenceReport
 from models.account_match import AccountMatchTask, AccountMatchCandidate, AccountMatchResult
+from models.typhoon import TyphoonTrack
 
 __all__ = [
     "User", "Target", "WebsiteTarget", "MonitorResult", "HotComment",
     "HotTopicSource", "HotTopic", "SentimentTask", "SentimentPost", "PlatformStats",
     "IntelligenceCategory", "IntelligenceReport",
     "AccountMatchTask", "AccountMatchCandidate", "AccountMatchResult",
+    "TyphoonTrack",
 ]

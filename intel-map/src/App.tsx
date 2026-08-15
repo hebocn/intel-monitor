@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { Skeleton, Spin, Tooltip } from 'antd'
 import {
   ReloadOutlined, EnvironmentOutlined, ThunderboltOutlined,
@@ -32,6 +32,7 @@ interface GeoSignal {
   platform: string; platform_label: string
   color: string; category: string
   count: number; title: string; summary: string
+  name: string
 }
 interface GeoSignalsResponse {
   signals: GeoSignal[]
@@ -54,6 +55,65 @@ const CATEGORY_COLORS: Record<string, string> = {
   Politics: '#F59E0B', Economy: '#3B82F6', Tech: '#A78BFA',
   Security: '#EF4444', Society: '#22C55E', Culture: '#EC4899', General: '#6B7280',
 }
+
+// ── 天气 / 台风 ──
+interface TyphoonSummary {
+  id: string; name: string; name_en: string; status: string
+  track_points: number; started_at: string | null; ended_at: string | null
+}
+interface TyphoonCurrent {
+  lat: number; lng: number
+  pressure: number | null; wind_speed: number | null
+  level: string; level_label: string
+  move_dir: string; move_speed: number | null
+  radius7: number | null; radius10: number | null
+  obs_time: string
+}
+interface TyphoonTrackPoint {
+  lat: number; lng: number
+  pressure: number | null; wind_speed: number | null
+  level: string; obs_time: string; is_forecast: boolean
+}
+interface TyphoonAffectedCity {
+  name: string; lat: number; lng: number
+  est_time: string; distance: number
+}
+interface TyphoonDetail {
+  id: string; name: string; name_en: string
+  current: TyphoonCurrent | null
+  track: TyphoonTrackPoint[]
+  affected_cities: TyphoonAffectedCity[]
+  degraded: boolean
+}
+interface TyphoonListResponse {
+  active: TyphoonSummary[]
+  archived: TyphoonSummary[]
+  degraded: boolean
+}
+interface WeatherWarning {
+  id: string; type: string; level: string; level_code: string
+  title: string; region: string
+  lat: number | null; lng: number | null
+  issued_by: string; issued_at: string
+}
+interface WarningsResponse { warnings: WeatherWarning[]; total: number; degraded: boolean }
+
+const TYPHOON_LEVEL_COLORS: Record<string, string> = {
+  TD: '#9CA3AF', TS: '#4ADE80', STS: '#FACC15',
+  TY: '#FB923C', STY: '#F87171', SuperTY: '#C084FC',
+}
+const WARNING_LEVEL_COLORS: Record<string, string> = {
+  blue: '#4FC3F7', yellow: '#FFD54F', orange: '#FF9800', red: '#F44336',
+}
+// 地图标记用淡色（浮层/弹窗仍用上面的深色保证文字可读）
+const WARNING_MARKER_COLORS: Record<string, string> = {
+  blue: '#81D4FA', yellow: '#FFE082', orange: '#FFCC80', red: '#FF8A80',
+}
+const WARNING_SEVERITY: Record<string, number> = { red: 3, orange: 2, yellow: 1, blue: 0 }
+// 暴雨预警影响半径（km，预警无半径数据，按级别估算）
+const WARN_RADIUS_KM: Record<string, number> = { red: 50, orange: 80, yellow: 120, blue: 150 }
+// 预警类型展示顺序（筛选 chips）
+const WARN_TYPE_ORDER = ['暴雨', '雷暴大风', '雷雨大风', '雷电', '大风', '冰雹', '大雾', '强对流']
 
 // ══════════════════════════════════════════════════
 // Helpers
@@ -164,6 +224,146 @@ function buildPopupHTML(s: GeoSignal): string {
   </div>`
 }
 
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// ── WGS-84 → GCJ-02（高德瓦片坐标系，仅中国大陆范围偏移，境外原样返回）──
+const GCJ_A = 6378245.0
+const GCJ_EE = 0.00669342162296594323
+
+function _gcjOutOfChina(lat: number, lng: number): boolean {
+  return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
+}
+
+function _gcjTransformLat(x: number, y: number): number {
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(y * Math.PI) + 40.0 * Math.sin(y / 3.0 * Math.PI)) * 2.0 / 3.0
+  ret += (160.0 * Math.sin(y / 12.0 * Math.PI) + 320 * Math.sin(y * Math.PI / 30.0)) * 2.0 / 3.0
+  return ret
+}
+
+function _gcjTransformLng(x: number, y: number): number {
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * Math.PI) + 20.0 * Math.sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(x * Math.PI) + 40.0 * Math.sin(x / 3.0 * Math.PI)) * 2.0 / 3.0
+  ret += (150.0 * Math.sin(x / 12.0 * Math.PI) + 300.0 * Math.sin(x / 30.0 * Math.PI)) * 2.0 / 3.0
+  return ret
+}
+
+function wgs84ToGcj02(lat: number, lng: number): [number, number] {
+  if (_gcjOutOfChina(lat, lng)) return [lat, lng]
+  let dLat = _gcjTransformLat(lng - 105.0, lat - 35.0)
+  let dLng = _gcjTransformLng(lng - 105.0, lat - 35.0)
+  const radLat = lat / 180.0 * Math.PI
+  let magic = Math.sin(radLat)
+  magic = 1 - GCJ_EE * magic * magic
+  const sqrtMagic = Math.sqrt(magic)
+  dLat = (dLat * 180.0) / ((GCJ_A * (1 - GCJ_EE)) / (magic * sqrtMagic) * Math.PI)
+  dLng = (dLng * 180.0) / (GCJ_A / sqrtMagic * Math.cos(radLat) * Math.PI)
+  return [lat + dLat, lng + dLng]
+}
+
+function fmtBeijing(iso: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleString('zh-CN', {
+    timeZone: 'Asia/Shanghai', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function typhoonPopupHTML(d: TyphoonDetail): string {
+  const c = d.current
+  if (!c) return `<div style="padding:2px;font-family:'JetBrains Mono','Fira Code',monospace;background:#151520;color:#e0e0e0;font-size:11px">${d.name || d.name_en || d.id}</div>`
+  const color = TYPHOON_LEVEL_COLORS[c.level] || '#9CA3AF'
+  const row = (k: string, v: string, vc?: string) =>
+    `<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0"><span style="font-size:9px;color:rgba(255,255,255,0.35)">${k}</span><span style="font-size:10px;color:${vc || '#e0e0e0'};font-weight:600">${v}</span></div>`
+  return `<div style="min-width:200px;padding:2px;font-family:'JetBrains Mono','Fira Code',monospace;background:#151520;color:#e0e0e0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:12px;font-weight:700;color:#f0f0f0">${d.name}${d.name_en && d.name_en !== 'nameless' ? ` <span style="font-size:9px;color:rgba(255,255,255,0.4)">${d.name_en}</span>` : ''}</span>
+      <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;background:${color}18;color:${color};border:1px solid ${color}30;font-size:9px;font-weight:600">${c.level_label || c.level}</span>
+    </div>
+    ${row('中心气压', c.pressure != null ? `${c.pressure} hPa` : '—')}
+    ${row('最大风速', c.wind_speed != null ? `${c.wind_speed} m/s` : '—')}
+    ${row('移动', c.move_dir ? `${c.move_dir} ${c.move_speed != null ? c.move_speed + ' km/h' : ''}` : '—')}
+    ${row('7级风圈', c.radius7 != null ? `${Math.round(c.radius7)} km` : '—')}
+    ${row('10级风圈', c.radius10 != null ? `${Math.round(c.radius10)} km` : '—')}
+    ${row('观测时间', fmtBeijing(c.obs_time))}
+  </div>`
+}
+
+function raindropSvg(color: string): string {
+  return `<svg width="14" height="18" viewBox="0 0 16 18">
+    <path d="M8 0.5 C 4.2 5.5 2 8.8 2 12 A 6 6 0 0 0 14 12 C 14 8.8 11.8 5.5 8 0.5 Z"
+      fill="${color}" fill-opacity="0.55" stroke="${color}" stroke-width="1" stroke-opacity="0.9"/>
+    <line class="rain-streak" x1="5.8" y1="1.5" x2="5" y2="5" stroke="${color}" stroke-width="1" stroke-linecap="round"/>
+    <line class="rain-streak s2" x1="10.2" y1="1.5" x2="11" y2="5" stroke="${color}" stroke-width="1" stroke-linecap="round"/>
+  </svg>`
+}
+
+function windSvg(c: string): string {
+  return `<svg width="14" height="18" viewBox="0 0 16 18">
+    <path d="M1 6.5 Q4 4.5 7 6.5 T13 6.5" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M3 10.5 Q6 8.5 9 10.5 T15 10.5" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M1 14.5 Q4 12.5 7 14.5 T13 14.5" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`
+}
+
+const WARN_TYPE_ICONS: Record<string, (color: string) => string> = {
+  '暴雨': raindropSvg,
+  '雷电': (c) => `<svg width="14" height="18" viewBox="0 0 16 18">
+    <path d="M9.5 1 L3.5 10.5 L7 10.5 L5.5 17 L12.5 7 L9 7 Z"
+      fill="${c}" fill-opacity="0.6" stroke="${c}" stroke-width="1" stroke-linejoin="round"/>
+  </svg>`,
+  '大风': windSvg,
+  '雷暴大风': windSvg,
+  '冰雹': (c) => `<svg width="14" height="18" viewBox="0 0 16 18">
+    <circle cx="8" cy="9.5" r="4.2" fill="${c}" fill-opacity="0.6" stroke="${c}" stroke-width="1"/>
+    <path d="M8 2.5 V4.2 M8 14.8 V16.5 M2.2 9.5 H3.9 M12.1 9.5 H13.8" stroke="${c}" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>`,
+  '大雾': (c) => `<svg width="14" height="18" viewBox="0 0 16 18">
+    <path d="M1.5 6 H14.5 M1.5 10 H14.5 M1.5 14 H14.5" stroke="${c}" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/>
+  </svg>`,
+  '强对流': (c) => `<svg width="14" height="18" viewBox="0 0 16 18">
+    <path d="M8 2.5 A 6.5 6.5 0 1 1 2.9 6.2" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="11.2" cy="11.8" r="1.4" fill="${c}"/>
+  </svg>`,
+}
+
+function warningIcon(type: string, color: string): L.DivIcon {
+  const build = WARN_TYPE_ICONS[type] || raindropSvg
+  return L.divIcon({
+    className: 'map-warn-drop-icon',
+    html: build(color),
+    iconSize: [14, 18],
+    iconAnchor: [7, 17],   // 水滴尖端锚定坐标点
+    popupAnchor: [0, -15],
+  })
+}
+
+function warningPopupHTML(w: WeatherWarning): string {
+  const color = WARNING_LEVEL_COLORS[w.level_code] || '#F44336'
+  const row = (k: string, v: string) =>
+    `<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0"><span style="font-size:9px;color:rgba(255,255,255,0.35);white-space:nowrap">${k}</span><span style="font-size:10px;color:#e0e0e0;font-weight:600;text-align:right">${v}</span></div>`
+  return `<div style="min-width:200px;padding:2px;font-family:'JetBrains Mono','Fira Code',monospace;background:#151520;color:#e0e0e0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;background:${color}18;color:${color};border:1px solid ${color}30;font-size:9px;font-weight:600">${w.type}</span>
+      <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:3px;background:${color}18;color:${color};border:1px solid ${color}30;font-size:9px;font-weight:600">${w.level}</span>
+    </div>
+    ${row('地区', w.region || '—')}
+    ${row('发布单位', w.issued_by || '—')}
+    ${row('发布时间', fmtBeijing(w.issued_at))}
+  </div>`
+}
+
 // ══════════════════════════════════════════════════
 // App
 // ══════════════════════════════════════════════════
@@ -179,9 +379,31 @@ export default function App() {
   const [mapPlatformFilter, setMapPlatformFilter] = useState<Set<string>>(new Set())
   const [mapCategoryFilter, setMapCategoryFilter] = useState<Set<string>>(new Set())
 
+  // ── 台风 / 预警状态 ──
+  const [weatherOn, setWeatherOn] = useState(false)           // 台风图层开关
+  const [warnOn, setWarnOn] = useState(false)                 // 预警图层开关
+  const [typhoonList, setTyphoonList] = useState<TyphoonListResponse | null>(null)
+  const [typhoonDetail, setTyphoonDetail] = useState<TyphoonDetail | null>(null)
+  const [selectedTyphoonId, setSelectedTyphoonId] = useState<string | null>(null) // null = 默认活跃台风
+  const [warnings, setWarnings] = useState<WarningsResponse | null>(null)
+  const [weatherDegraded, setWeatherDegraded] = useState(false)
+  const [histOpen, setHistOpen] = useState(false)
+  const [warnPanelCollapsed, setWarnPanelCollapsed] = useState(false)
+  const [activeWarning, setActiveWarning] = useState<WeatherWarning | null>(null)   // 点击浮层条目时临时显示影响圈
+  const [warnTypeFilter, setWarnTypeFilter] = useState<Set<string>>(new Set(['暴雨']))  // 预警类型筛选，默认仅暴雨
+  const [mapReady, setMapReady] = useState(false)
+
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapInstance = useRef<L.Map | null>(null)
   const legendControl = useRef<L.Control | null>(null)
+  const typhoonLayer = useRef<L.LayerGroup | null>(null)
+  const warningLayer = useRef<L.LayerGroup | null>(null)
+  const warningTempLayer = useRef<L.LayerGroup | null>(null)
+  const signalMarkers = useRef<{ marker: L.CircleMarker; signal: GeoSignal; size: number }[]>([])
+  const warningMarkers = useRef<Record<string, L.Marker>>({})
+  const affectedKeys = useRef<Set<string>>(new Set())
+  const warnAffectedKeys = useRef<Set<string>>(new Set())
+  const panTyphoonNext = useRef(false)
 
   // Clock
   useEffect(() => {
@@ -210,33 +432,107 @@ export default function App() {
     } finally {
       setLoading(false)
     }
+    fetchWeather() // 气象数据独立刷新，不阻塞主数据
   }
 
+  // ── 气象数据 ──
+  const fetchWeather = useCallback(async () => {
+    try {
+      const [tRes, wRes] = await Promise.all([
+        api.get('/weather/typhoons'),
+        api.get('/weather/warnings'),
+      ])
+      setTyphoonList(tRes.data)
+      setWarnings(wRes.data)
+      setWeatherDegraded(!!(tRes.data.degraded || wRes.data.degraded))
+    } catch {
+      // 保留上次成功快照，仅提示降级
+      setWeatherDegraded(true)
+    }
+  }, [])
+
+  const fetchTyphoonDetail = useCallback(async (id: string) => {
+    try {
+      const res = await api.get(`/weather/typhoons/${id}`)
+      setTyphoonDetail(res.data)
+      setWeatherDegraded(d => d || !!res.data.degraded)
+    } catch {
+      setWeatherDegraded(true) // 保留上次快照
+    }
+  }, [])
+
   useEffect(() => { fetchAll() }, [])
+
+  // 台风详情：开关打开时拉当前选中台风（默认活跃台风）
+  const displayedTyphoonId = weatherOn
+    ? (selectedTyphoonId || typhoonList?.active[0]?.id || null)
+    : null
+  useEffect(() => {
+    if (displayedTyphoonId) fetchTyphoonDetail(displayedTyphoonId)
+  }, [displayedTyphoonId, fetchTyphoonDetail])
+
+  // 10 分钟轮询气象数据
+  useEffect(() => {
+    const t = setInterval(() => {
+      fetchWeather()
+      if (displayedTyphoonId) fetchTyphoonDetail(displayedTyphoonId)
+    }, 10 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [fetchWeather, fetchTyphoonDetail, displayedTyphoonId])
+
+  // 历史下拉：点击外部关闭
+  useEffect(() => {
+    if (!histOpen) return
+    const h = () => setHistOpen(false)
+    document.addEventListener('click', h)
+    return () => document.removeEventListener('click', h)
+  }, [histOpen])
 
   // ── Initialise Leaflet ──
   const initMap = useCallback(() => {
     if (!mapContainer.current || mapInstance.current) return
-    const m = L.map(mapContainer.current, { center: [28, 105], zoom: 2, scrollWheelZoom: true, zoomControl: false, attributionControl: false })
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 10, minZoom: 2 }).addTo(m)
+    const m = L.map(mapContainer.current, { center: [28, 105], zoom: 2, scrollWheelZoom: true, zoomControl: false, attributionControl: true })
+    // 高德中文瓦片（GCJ-02 坐标系，数据渲染时经 wgs84ToGcj02 转换；浅色瓦片由 CSS 滤镜暗化；无需 key）
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
+      subdomains: ['1', '2', '3', '4'],
+      maxZoom: 16,
+      minZoom: 2,
+      attribution: '©高德地图',
+    }).addTo(m)
+    typhoonLayer.current = L.layerGroup().addTo(m)
+    warningLayer.current = L.layerGroup().addTo(m)
+    warningTempLayer.current = L.layerGroup().addTo(m)
     mapInstance.current = m
+    setMapReady(true)
   }, [])
 
   const updateMap = useCallback((signals: GeoSignal[]) => {
     const m = mapInstance.current; if (!m) return
     m.eachLayer(l => { if (l instanceof L.CircleMarker || l instanceof L.Marker) m.removeLayer(l) })
     if (legendControl.current) { m.removeControl(legendControl.current); legendControl.current = null }
+    signalMarkers.current = []
     if (signals.length === 0) return
     const markers: L.CircleMarker[] = []
     for (const s of signals) {
+      const key = `${s.lat.toFixed(3)},${s.lng.toFixed(3)}`
+      const affected = affectedKeys.current.has(key) || warnAffectedKeys.current.has(key)
       const size = Math.max(7, Math.min(18, Math.sqrt(s.count) * 2.8))
-      const circle = L.circleMarker([s.lat, s.lng], { radius: size, fillColor: s.color, color: s.color, weight: 1.5, opacity: 0.55, fillOpacity: 0.3 }).addTo(m)
+      const [lat, lng] = wgs84ToGcj02(s.lat, s.lng)   // 高德底图为 GCJ-02，渲染时转换
+      const circle = L.circleMarker([lat, lng], {
+        radius: affected ? size + 5 : size,
+        fillColor: affected ? '#FFFFFF' : s.color,
+        color: affected ? '#FFFFFF' : s.color,
+        weight: affected ? 3 : 1.5,
+        opacity: 0.8,
+        fillOpacity: affected ? 0.65 : 0.3,
+      }).addTo(m)
       circle.bindPopup(buildPopupHTML(s), { maxWidth: 280, closeButton: true })
       circle.bindTooltip(s.platform_label + ' · ' + s.category + ' · ' + String(s.count) + ' signals', { direction: 'top', offset: [0, -8], opacity: 0.9, className: 'map-tooltip' })
-      circle.on('mouseover', () => { circle.setStyle({ fillOpacity: 0.6, weight: 3, opacity: 1 }); circle.setRadius(size * 1.3) })
-      circle.on('mouseout', () => { circle.setStyle({ fillOpacity: 0.3, weight: 1.5, opacity: 0.55 }); circle.setRadius(size) })
+      circle.on('mouseover', () => { circle.setStyle({ fillOpacity: 0.8, weight: 3, opacity: 1 }); circle.setRadius((affected ? size + 5 : size) * 1.3) })
+      circle.on('mouseout', () => { circle.setStyle({ fillOpacity: affected ? 0.65 : 0.3, weight: affected ? 3 : 1.5, opacity: 0.8 }); circle.setRadius(affected ? size + 5 : size) })
       markers.push(circle)
-      L.circleMarker([s.lat, s.lng], { radius: size * 1.8, fillColor: 'transparent', color: s.color, weight: 1, opacity: 0.2, fillOpacity: 0, interactive: false }).addTo(m)
+      signalMarkers.current.push({ marker: circle, signal: s, size })
+      L.circleMarker([lat, lng], { radius: size * 1.8, fillColor: 'transparent', color: s.color, weight: 1, opacity: 0.2, fillOpacity: 0, interactive: false }).addTo(m)
     }
     const Legend = L.Control.extend({ onAdd: () => { const div = L.DomUtil.create('div'); div.innerHTML = buildLegendHTML(signals); return div } })
     const legend = new Legend({ position: 'bottomleft' }); legend.addTo(m); legendControl.current = legend
@@ -245,12 +541,196 @@ export default function App() {
   }, [])
 
   useEffect(() => { if (!loading) initMap() }, [initMap, loading])
-  const filteredSignals = (geoData?.signals || []).filter(s => {
-    if (mapPlatformFilter.size > 0 && !mapPlatformFilter.has(s.platform)) return false
-    if (mapCategoryFilter.size > 0 && !mapCategoryFilter.has(s.category)) return false
-    return true
-  })
-  useEffect(() => { if (filteredSignals.length > 0 && mapInstance.current) { const t = setTimeout(() => updateMap(filteredSignals), 100); return () => clearTimeout(t) } }, [geoData, mapPlatformFilter, mapCategoryFilter, updateMap])
+  const filteredSignals = useMemo(() =>
+    (geoData?.signals || []).filter(s => {
+      if (mapPlatformFilter.size > 0 && !mapPlatformFilter.has(s.platform)) return false
+      if (mapCategoryFilter.size > 0 && !mapCategoryFilter.has(s.category)) return false
+      return true
+    }),
+    [geoData, mapPlatformFilter, mapCategoryFilter]
+  )
+  useEffect(() => { if (filteredSignals.length > 0 && mapInstance.current) { const t = setTimeout(() => updateMap(filteredSignals), 100); return () => clearTimeout(t) } }, [filteredSignals, updateMap])
+
+  // ── 台风影响信号（风圈内 haversine）──
+  const typhoonCenter = weatherOn ? (typhoonDetail?.current || null) : null
+  const affectedRadius = typhoonCenter ? Math.max(typhoonCenter.radius7 || 0, typhoonCenter.radius10 || 0) : 0
+  const affectedSignals = useMemo(() =>
+    (typhoonCenter && affectedRadius > 0)
+      ? filteredSignals.filter(s => haversineKm(s.lat, s.lng, typhoonCenter.lat, typhoonCenter.lng) <= affectedRadius)
+      : [],
+    [filteredSignals, typhoonCenter, affectedRadius]
+  )
+  // 当前选中预警影响圈内的信号（声明在重标样式 effect 之前，保证 ref 先同步）
+  const warnAffectedSignals = useMemo(() => {
+    if (!warnOn || !activeWarning || activeWarning.lat == null || activeWarning.lng == null) return []
+    const r = WARN_RADIUS_KM[activeWarning.level_code] || 120
+    return filteredSignals.filter(s => haversineKm(s.lat, s.lng, activeWarning.lat!, activeWarning.lng!) <= r)
+  }, [warnOn, activeWarning, filteredSignals])
+  useEffect(() => {
+    affectedKeys.current = new Set(affectedSignals.map(s => `${s.lat.toFixed(3)},${s.lng.toFixed(3)}`))
+  }, [affectedSignals])
+  useEffect(() => {
+    warnAffectedKeys.current = new Set(warnAffectedSignals.map(s => `${s.lat.toFixed(3)},${s.lng.toFixed(3)}`))
+  }, [warnAffectedSignals])
+
+  // 台风风圈/预警影响圈变化时重标信号点样式（不重建、不 refit）
+  useEffect(() => {
+    for (const { marker, signal, size } of signalMarkers.current) {
+      const key = `${signal.lat.toFixed(3)},${signal.lng.toFixed(3)}`
+      const affected = affectedKeys.current.has(key) || warnAffectedKeys.current.has(key)
+      marker.setStyle({
+        radius: affected ? size + 5 : size,
+        fillColor: affected ? '#FFFFFF' : signal.color,
+        color: affected ? '#FFFFFF' : signal.color,
+        weight: affected ? 3 : 1.5,
+        opacity: 0.8,
+        fillOpacity: affected ? 0.65 : 0.3,
+      })
+    }
+  }, [affectedSignals, warnAffectedSignals])
+
+  // 预警按类型筛选（默认仅暴雨，chips 可多选），按级别排序（红>橙>黄>蓝），同级按发布时间倒序
+  const filteredWarnings = useMemo(() =>
+    (warnings?.warnings || [])
+      .filter(w => warnTypeFilter.has(w.type))
+      .sort((a, b) =>
+        ((WARNING_SEVERITY[b.level_code] || 0) - (WARNING_SEVERITY[a.level_code] || 0))
+        || (b.issued_at || '').localeCompare(a.issued_at || '')
+      ),
+    [warnings, warnTypeFilter]
+  )
+
+  // ── 台风图层渲染 ──
+  useEffect(() => {
+    const m = mapInstance.current
+    const group = typhoonLayer.current
+    if (!m || !group || !mapReady) return
+    group.clearLayers()
+    if (!weatherOn || !typhoonDetail || typhoonDetail.track.length === 0) return
+    const d = typhoonDetail
+    const obs = d.track.filter(p => !p.is_forecast)
+    const fc = d.track.filter(p => p.is_forecast)
+    const color = TYPHOON_LEVEL_COLORS[d.current?.level || obs[obs.length - 1]?.level || ''] || '#9CA3AF'
+    const lvlColor = (lvl: string) => TYPHOON_LEVEL_COLORS[lvl] || '#9CA3AF'
+    const gcj = (p: { lat: number; lng: number }): [number, number] => wgs84ToGcj02(p.lat, p.lng)
+    // 实况路径（实线）
+    if (obs.length > 1) {
+      L.polyline(obs.map(gcj), { color, weight: 2, opacity: 0.9 }).addTo(group)
+    }
+    // 预报路径（虚线，接在最后一个实况点后）
+    if (fc.length > 0 && obs.length > 0) {
+      L.polyline([obs[obs.length - 1], ...fc].map(gcj), { color, weight: 1.5, opacity: 0.7, dashArray: '6 6' }).addTo(group)
+    }
+    // 历史实况点（按强度着色）
+    for (const p of obs) {
+      L.circleMarker(gcj(p), { radius: 4, color: '#0f0f18', weight: 0.8, fillColor: lvlColor(p.level), fillOpacity: 0.95 }).addTo(group)
+    }
+    // 预报点（空心）
+    for (const p of fc) {
+      L.circleMarker(gcj(p), { radius: 3, color: lvlColor(p.level), weight: 1, fillColor: 'transparent', fillOpacity: 0 }).addTo(group)
+    }
+    // 当前点风圈 + 标记
+    if (d.current) {
+      const c = d.current
+      const [clat, clng] = gcj(c)
+      if (c.radius7) L.circle([clat, clng], { radius: c.radius7 * 1000, color: `${color}66`, weight: 1, fillColor: color, fillOpacity: 0.08, className: 'typhoon-wind-circle', interactive: false }).addTo(group)
+      if (c.radius10) L.circle([clat, clng], { radius: c.radius10 * 1000, color: `${color}99`, weight: 1, fillColor: color, fillOpacity: 0.12, className: 'typhoon-wind-circle', interactive: false }).addTo(group)
+      const cur = L.circleMarker([clat, clng], { radius: 7, color: '#FFFFFF', weight: 2, fillColor: lvlColor(c.level), fillOpacity: 1 }).addTo(group)
+      cur.bindPopup(typhoonPopupHTML(d), { maxWidth: 280, closeButton: true })
+      cur.bindTooltip(`${d.name} · ${c.level_label || c.level}`, { direction: 'top', offset: [0, -10], opacity: 0.9, className: 'map-tooltip' })
+    }
+    // 影响城市环标记（48h 窗口内风圈覆盖的城市，后端计算）
+    for (const city of d.affected_cities || []) {
+      const [clat, clng] = wgs84ToGcj02(city.lat, city.lng)
+      const ring = L.circleMarker([clat, clng], {
+        radius: 7, color: '#FFD54F', weight: 2,
+        fillColor: '#FFD54F', fillOpacity: 0.12,
+      }).addTo(group)
+      ring.bindTooltip(`${city.name} · 距台风约 ${city.distance}km · 预计 ${fmtBeijing(city.est_time)}`, { direction: 'top', offset: [0, -8], opacity: 0.9, className: 'map-tooltip' })
+    }
+    // 用户切换台风/开开关时 pan 到台风
+    if (panTyphoonNext.current) {
+      panTyphoonNext.current = false
+      const bounds = L.latLngBounds(d.track.map(gcj))
+      if (bounds.isValid()) m.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 })
+    }
+  }, [weatherOn, typhoonDetail, mapReady])
+
+  // ── 预警图层渲染（按类型筛选，全部级别）──
+  useEffect(() => {
+    const group = warningLayer.current
+    if (!group || !mapReady) return
+    group.clearLayers()
+    warningMarkers.current = {}
+    if (!warnOn || filteredWarnings.length === 0) return
+    for (const w of filteredWarnings) {
+      if (w.lat == null || w.lng == null) continue
+      const color = WARNING_MARKER_COLORS[w.level_code] || '#FF8A80'
+      const mk = L.marker(wgs84ToGcj02(w.lat, w.lng), { icon: warningIcon(w.type, color) }).addTo(group)
+      mk.bindPopup(warningPopupHTML(w), { maxWidth: 280, closeButton: true })
+      // 点击图标：与浮层条目一致，切换影响圈显示（阻止冒泡避免地图点击取消逻辑误触发）
+      mk.on('click', (e) => {
+        L.DomEvent.stopPropagation(e)
+        setActiveWarning(prev => prev?.id === w.id ? null : w)
+      })
+      warningMarkers.current[w.id] = mk
+    }
+  }, [warnOn, filteredWarnings, mapReady])
+
+  // ── 预警×信号联动 ──
+
+  // 每条预警影响圈内的信号计数（浮层每行显示）
+  const warnSignalCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const w of filteredWarnings) {
+      if (w.lat == null || w.lng == null) continue
+      const r = WARN_RADIUS_KM[w.level_code] || 120
+      let n = 0
+      for (const s of filteredSignals) {
+        if (haversineKm(s.lat, s.lng, w.lat, w.lng) <= r) n++
+      }
+      counts[w.id] = n
+    }
+    return counts
+  }, [filteredWarnings, filteredSignals])
+
+  // 点击预警浮层条目：临时影响圈（圈内信号高亮由 warnAffectedSignals 统一处理）
+  useEffect(() => {
+    const group = warningTempLayer.current
+    if (!group || !mapReady) return
+    group.clearLayers()
+    if (!warnOn || !activeWarning) return
+    const w = activeWarning
+    if (w.lat == null || w.lng == null) return
+    const r = WARN_RADIUS_KM[w.level_code] || 120
+    const color = WARNING_LEVEL_COLORS[w.level_code] || '#F44336'
+    const [clat, clng] = wgs84ToGcj02(w.lat, w.lng)
+    L.circle([clat, clng], {
+      radius: r * 1000, color: `${color}99`, weight: 1.5,
+      fillColor: color, fillOpacity: 0.1,
+      className: 'typhoon-wind-circle', interactive: false,
+    }).addTo(group)
+  }, [activeWarning, warnOn, mapReady])
+
+  // 点击地图空白处取消临时影响圈
+  useEffect(() => {
+    const m = mapInstance.current
+    if (!m || !mapReady) return
+    const h = (e: L.LeafletMouseEvent) => {
+      const target = e.originalEvent.target as Element
+      if (target.closest?.('.map-warn-panel')) return   // 浮层内部点击不取消
+      setActiveWarning(null)
+    }
+    m.on('click', h)
+    return () => { m.off('click', h) }
+  }, [mapReady])
+
+  // 预警浮层内部点击不穿透到地图（避免触发取消逻辑）
+  useEffect(() => {
+    const panel = document.querySelector('.map-warn-panel')
+    if (!panel) return
+    L.DomEvent.disableClickPropagation(panel as HTMLElement)
+  }, [warnOn, warnPanelCollapsed, mapReady])
   useEffect(() => { const h = () => mapInstance.current?.invalidateSize(); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h) }, [])
   useEffect(() => {
     const t = setInterval(() => { mapInstance.current?.eachLayer(l => { if (l instanceof L.CircleMarker && (l.options as any).fillColor === 'transparent') { l.setStyle({ opacity: parseFloat(String((l.options as any).opacity || 0.2)) > 0.4 ? 0.1 : 0.25 }) } }) }, 1500)
@@ -372,8 +852,54 @@ export default function App() {
                 )
               })}
               <span style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.1)' }} />
+              {/* Weather / Typhoon controls */}
+              <button className={'map-filter-btn' + (weatherOn ? ' active' : '')}
+                onClick={() => { panTyphoonNext.current = true; setWeatherOn(v => !v) }}
+                title="台风路径 / 风圈图层"
+              >台风</button>
+              <button className={'map-filter-btn' + (warnOn ? ' active' : '')}
+                onClick={() => setWarnOn(v => !v)}
+                title="极端天气预警图层"
+              >预警</button>
+              <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <button className={'map-filter-btn' + (selectedTyphoonId ? ' active' : '')}
+                  onClick={() => setHistOpen(v => !v)}
+                  title="选择台风"
+                >历史▾</button>
+                {histOpen && (
+                  <div className="typhoon-hist-menu">
+                    <div className="typhoon-hist-head">当前活跃台风</div>
+                    {(typhoonList?.active || []).map(t => (
+                      <div key={t.id} className={'typhoon-hist-item' + (displayedTyphoonId === t.id ? ' sel' : '')}
+                        onClick={() => { panTyphoonNext.current = true; setSelectedTyphoonId(t.id); setWeatherOn(true); setHistOpen(false) }}>
+                        {t.name} <span style={{ opacity: 0.4 }}>{t.name_en !== 'nameless' ? t.name_en : ''}</span>
+                      </div>
+                    ))}
+                    {(typhoonList?.active || []).length === 0 && <div className="typhoon-hist-empty">无活跃台风</div>}
+                    {selectedTyphoonId && <div className={'typhoon-hist-item sel'}
+                      onClick={() => { panTyphoonNext.current = true; setSelectedTyphoonId(null); setWeatherOn(true); setHistOpen(false) }}>
+                      ⟲ 当前活跃台风
+                    </div>}
+                    <div className="typhoon-hist-head">历史台风</div>
+                    {(typhoonList?.archived || []).map(t => (
+                      <div key={t.id} className={'typhoon-hist-item' + (displayedTyphoonId === t.id ? ' sel' : '')}
+                        onClick={() => { panTyphoonNext.current = true; setSelectedTyphoonId(t.id); setWeatherOn(true); setHistOpen(false) }}>
+                        {t.name || t.name_en || t.id} <span style={{ opacity: 0.4 }}>{t.track_points} 点</span>
+                      </div>
+                    ))}
+                    {(typhoonList?.archived || []).length === 0 && <div className="typhoon-hist-empty">暂无存档</div>}
+                  </div>
+                )}
+              </div>
+              {(weatherOn || warnOn) && weatherDegraded && (
+                <span style={{ fontSize: 8, color: '#F59E0B' }} title="NMC 接口暂不可用，展示上次成功快照">气象数据不可用</span>
+              )}
+              <span style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.1)' }} />
               <button onClick={fetchAll} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: '2px 8px', fontSize: 9, fontFamily: 'inherit' }}><ReloadOutlined style={{ marginRight: 4, fontSize: 9 }} />刷新</button>
               <span className="signal-counter" style={{ fontSize: 9, color: '#00ff88', fontFamily: '"JetBrains Mono","Fira Code",monospace', fontWeight: 600 }}>{geoData?.total_signals || 0} signals</span>
+              {typhoonCenter && (
+                <span style={{ fontSize: 9, color: '#FFFFFF', fontFamily: '"JetBrains Mono","Fira Code",monospace', fontWeight: 600, background: 'rgba(255,255,255,0.08)', borderRadius: 3, padding: '1px 6px' }}>受影响信号 {affectedSignals.length} 个</span>
+              )}
             </div>
           </div>
           <div ref={mapContainer} style={{ height: 380, background: '#0a0a0a', position: 'relative' }}>
@@ -381,9 +907,7 @@ export default function App() {
             {(() => {
               const cityCount: Record<string, number> = {}
               for (const s of (geoData?.signals || [])) {
-                const key = s.lat.toFixed(1) + ',' + s.lng.toFixed(1)
-                // Try to find city name from GEO_CITY_MAP-like lookup
-                // For now use the signal's title prefix as city indicator
+                // 后端 GEO_CITY_MAP 已匹配城市名，直接按城市聚合
                 const name = s.name || s.title?.split(/[ ,，]/)[0] || "Unknown"
                 cityCount[name] = (cityCount[name] || 0) + s.count
               }
@@ -401,8 +925,78 @@ export default function App() {
                 </div>
               )
             })()}
+            {/* Weather Warnings Panel (类型筛选，全部级别，可折叠) */}
+            {warnOn && (
+              <div className={'map-warn-panel' + (warnPanelCollapsed ? ' collapsed' : '')}>
+                <div className="map-warn-panel-title" title={warnPanelCollapsed ? '展开预警列表' : '折叠预警列表'}
+                  onClick={() => setWarnPanelCollapsed(v => !v)}>
+                  <span>预警信号</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>{filteredWarnings.length}</span>
+                    <span className="map-warn-caret">{warnPanelCollapsed ? '▸' : '▾'}</span>
+                  </span>
+                </div>
+                {!warnPanelCollapsed && (
+                  <>
+                    <div className="map-warn-chips">
+                      {WARN_TYPE_ORDER.map(t => {
+                        const cnt = (warnings?.warnings || []).filter(w => w.type === t).length
+                        if (cnt === 0) return null
+                        const active = warnTypeFilter.has(t)
+                        return (
+                          <button key={t} className={'map-warn-chip' + (active ? ' sel' : '')}
+                            onClick={() => {
+                              const next = new Set(warnTypeFilter)
+                              if (next.has(t)) { next.delete(t) } else { next.add(t) }
+                              setWarnTypeFilter(next)
+                            }}>
+                            {t}<span style={{ opacity: 0.55 }}> {cnt}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="map-warn-list">
+                      {filteredWarnings.slice(0, 50).map(w => {
+                        const color = WARNING_LEVEL_COLORS[w.level_code] || '#F44336'
+                        const count = warnSignalCounts[w.id] || 0
+                        const isActive = activeWarning?.id === w.id
+                        return (
+                          <div key={w.id} className={'map-warn-row' + (isActive ? ' sel' : '')}
+                            title={`${w.type}${w.level}预警`}
+                            onClick={() => {
+                              setActiveWarning(isActive ? null : w)   // 再点取消
+                              const mk = warningMarkers.current[w.id]
+                              const m = mapInstance.current
+                              if (mk && m) {
+                                m.flyTo(mk.getLatLng(), Math.max(m.getZoom(), 6), { duration: 0.6 })
+                                mk.openPopup()
+                              }
+                            }}>
+                            <span className="map-warn-bar" style={{ background: color }} />
+                            <span className="map-warn-type" style={{ color }}>{w.type}</span>
+                            <span className="map-warn-region">{w.region}</span>
+                            <span className="map-warn-time">{fmtBeijing(w.issued_at)}</span>
+                            <span className="map-warn-count" style={{ color: count > 0 ? '#00ff88' : 'rgba(255,255,255,0.15)' }}
+                              title={`影响圈内信号数（${WARN_RADIUS_KM[w.level_code] || 120}km）`}>{count}</span>
+                          </div>
+                        )
+                      })}
+                      {warnTypeFilter.size === 0
+                        ? <div className="typhoon-hist-empty">未选择预警类型</div>
+                        : filteredWarnings.length === 0
+                          ? <div className="typhoon-hist-empty">当前无该类型预警</div>
+                          : null}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <style>{`
+            /* 高德浅色瓦片暗化（暗色模式通用技巧：反相 + 色相回转） */
+            .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.7); }
+            .leaflet-control-attribution { background: rgba(15,15,24,0.75) !important; color: rgba(255,255,255,0.3) !important; font-size: 8px !important; }
+            .leaflet-control-attribution a { color: rgba(255,255,255,0.4) !important; }
             .map-legend { display: flex; gap: 16px; flex-wrap: wrap; background: rgba(15,15,24,0.92); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 14px; font-size: 10px; font-family: 'JetBrains Mono','Fira Code',monospace; }
             .map-legend-col { display: flex; flex-direction: column; gap: 4px; }
             .map-legend-title { color: rgba(255,255,255,0.25); font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
@@ -421,6 +1015,51 @@ export default function App() {
             .map-hot-city-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; }
             .map-hot-city-name { color: rgba(255,255,255,0.7); }
             .map-hot-city-count { color: #00ff88; font-weight: 600; font-family: "JetBrains Mono","Fira Code",monospace; }
+
+            /* 台风风圈脉冲 */
+            .typhoon-wind-circle { animation: wind-pulse 2.5s ease-in-out infinite; }
+            @keyframes wind-pulse { 0%,100% { fill-opacity: 0.06; stroke-opacity: 0.35; } 50% { fill-opacity: 0.18; stroke-opacity: 0.75; } }
+
+            /* 历史台风下拉 */
+            .typhoon-hist-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 1100; min-width: 150px; max-height: 240px; overflow-y: auto; background: rgba(15,15,24,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 4px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
+            .typhoon-hist-head { font-size: 7px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.25); padding: 6px 8px 2px; }
+            .typhoon-hist-item { font-size: 10px; color: rgba(255,255,255,0.6); padding: 4px 8px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; white-space: nowrap; }
+            .typhoon-hist-item:hover { background: rgba(255,255,255,0.06); color: #e0e0e0; }
+            .typhoon-hist-item.sel { color: #00ff88; background: rgba(0,255,136,0.06); }
+            .typhoon-hist-empty { font-size: 9px; color: rgba(255,255,255,0.2); padding: 4px 8px; }
+
+            /* 预警浮层（地图内右上，可折叠） */
+            .map-warn-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; width: 230px; max-height: 300px; display: flex; flex-direction: column; background: rgba(15,15,24,0.9); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 10px; font-size: 9px; }
+            .map-warn-panel-title { display: flex; align-items: center; justify-content: space-between; color: rgba(255,255,255,0.3); font-size: 7px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; user-select: none; margin-bottom: 6px; }
+            .map-warn-panel.collapsed .map-warn-panel-title { margin-bottom: 0; }
+            .map-warn-panel-title:hover { color: rgba(255,255,255,0.55); }
+            .map-warn-caret { color: rgba(255,255,255,0.4); font-size: 9px; }
+            .map-warn-list { overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+            .map-warn-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 3px; cursor: pointer; }
+            .map-warn-row:hover { background: rgba(255,255,255,0.06); }
+            .map-warn-bar { width: 3px; height: 14px; border-radius: 2px; flex-shrink: 0; }
+            .map-warn-type { font-size: 9px; font-weight: 600; flex-shrink: 0; }
+            .map-warn-region { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,0.6); }
+            .map-warn-time { font-size: 8px; color: rgba(255,255,255,0.25); font-family: "JetBrains Mono","Fira Code",monospace; flex-shrink: 0; }
+            .map-warn-count { font-size: 8px; font-weight: 700; font-family: "JetBrains Mono","Fira Code",monospace; flex-shrink: 0; min-width: 12px; text-align: right; }
+            .map-warn-row.sel { background: rgba(255,255,255,0.08); }
+            .map-warn-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+            .map-warn-chip { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; color: rgba(255,255,255,0.4); cursor: pointer; font-size: 8px; font-family: inherit; padding: 1px 5px; letter-spacing: 0.5px; transition: all 0.15s; }
+            .map-warn-chip:hover { color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.25); }
+            .map-warn-chip.sel { background: rgba(0,255,136,0.08); border-color: rgba(0,255,136,0.35); color: #00ff88; }
+
+            /* 雨滴形预警标记 + 降雨动画 */
+            .map-warn-drop-icon svg { filter: drop-shadow(0 0 4px rgba(255,138,128,0.4)); }
+            .map-warn-drop-icon path { animation: warn-drop-pulse 2.5s ease-in-out infinite; }
+            .map-warn-drop-icon .rain-streak { animation: rain-fall 1.6s linear infinite; opacity: 0; }
+            .map-warn-drop-icon .rain-streak.s2 { animation-delay: 0.8s; }
+            @keyframes warn-drop-pulse { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+            @keyframes rain-fall {
+              0% { transform: translateY(0); opacity: 0; }
+              20% { opacity: 0.75; }
+              60% { opacity: 0.4; }
+              100% { transform: translateY(11px); opacity: 0; }
+            }
             .leaflet-popup-content-wrapper { background: #151520 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; box-shadow: 0 4px 24px rgba(0,0,0,0.6) !important; color: #e0e0e0 !important; }
             .leaflet-popup-tip { background: #151520 !important; }
             .leaflet-popup-close-button { color: rgba(255,255,255,0.4) !important; }

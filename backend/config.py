@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # Google Custom Search Engine (CSE) — Facebook search
     GOOGLE_CSE_ID: str = "016621447308871563343:vylfmzjmlti"
 
+    # Feishu (Lark) bot — set FEISHU_ENABLED=true + app credentials to activate
+    FEISHU_ENABLED: bool = False
+    FEISHU_APP_ID: str = ""
+    FEISHU_APP_SECRET: str = ""
+
     # AI Prompts
     SUMMARIZE_POSTS_PROMPT: str = (
         "你是一个情报分析助手。请对以下社交媒体账号今日发布的内容进行简洁总结。"

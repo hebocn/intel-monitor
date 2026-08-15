@@ -3,9 +3,9 @@ import { Input, Button, Typography, message, Tag, Alert, Radio, Tooltip, Skeleto
 import {
   SaveOutlined, SyncOutlined, ClockCircleOutlined,
   CheckCircleOutlined, CloseCircleOutlined, ApiOutlined,
-  KeyOutlined, StarFilled, ScheduleOutlined,
+  KeyOutlined, StarFilled, ScheduleOutlined, MessageOutlined,
 } from '@ant-design/icons'
-import { scheduleAPI, settingsAPI } from '../services/api'
+import { scheduleAPI, settingsAPI, feishuAPI } from '../services/api'
 
 const { Text } = Typography
 
@@ -315,6 +315,14 @@ export default function SettingsPage() {
     intelligence_report: '', intelligence_report_default: '',
   })
   const [promptSaving, setPromptSaving] = useState(false)
+  const [feishuStatus, setFeishuStatus] = useState<{
+    configured: boolean; bound: boolean; push_enabled: boolean;
+    app_secret_set: boolean; app_id: string;
+  } | null>(null)
+  const [bindCode, setBindCode] = useState<string | null>(null)
+  const [bindCodeLoading, setBindCodeLoading] = useState(false)
+  const [feishuSecret, setFeishuSecret] = useState('')
+  const [secretSaving, setSecretSaving] = useState(false)
 
   const defaultState: ProviderState = {
     hasKey: false, maskedKey: '', model: '', modelSaving: false,
@@ -366,12 +374,70 @@ export default function SettingsPage() {
     } catch {}
   }
 
+  const fetchFeishuStatus = async () => {
+    try {
+      const res = await feishuAPI.status()
+      setFeishuStatus(res.data)
+    } catch {}
+  }
+
   useEffect(() => {
     fetchJobs()
     fetchAllProviderStatus()
     fetchActiveProvider()
     fetchPrompts()
+    fetchFeishuStatus()
   }, [])
+
+  const handleSaveSecret = async () => {
+    if (!feishuSecret.trim()) {
+      message.warning('请输入 App Secret')
+      return
+    }
+    setSecretSaving(true)
+    try {
+      const res = await feishuAPI.saveConfig({ app_secret: feishuSecret.trim() })
+      setFeishuSecret('')
+      setFeishuStatus(prev => prev ? {
+        ...prev,
+        configured: res.data.configured,
+        app_secret_set: true,
+      } : prev)
+      if (res.data.reloading) {
+        message.info('配置已保存，后端将自动重启生效（约 5 秒），期间页面可能短暂无响应')
+      } else {
+        message.success('配置已保存')
+      }
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '保存失败')
+    } finally {
+      setSecretSaving(false)
+    }
+  }
+
+  const handleGenerateBindCode = async () => {
+    setBindCodeLoading(true)
+    try {
+      const res = await feishuAPI.bindCode()
+      setBindCode(res.data.code)
+      message.success('绑定码已生成，15 分钟内有效')
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '生成绑定码失败')
+    } finally {
+      setBindCodeLoading(false)
+    }
+  }
+
+  const handleUnbind = async () => {
+    try {
+      await feishuAPI.unbind()
+      setBindCode(null)
+      setFeishuStatus(prev => prev ? { ...prev, bound: false } : prev)
+      message.success('已解绑飞书')
+    } catch {
+      message.error('解绑失败')
+    }
+  }
 
   const handleModelSave = async (provider: string, model: string) => {
     await settingsAPI.setProviderModel(provider, model)
@@ -649,8 +715,117 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Scheduler */}
+      {/* Feishu push */}
       <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+        <div style={{
+          background: 'var(--surface-0, #fff)',
+          borderRadius: 16,
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
+            background: 'linear-gradient(180deg, #3370ff, #3370ff88)',
+            borderRadius: '4px 0 0 4px',
+          }} />
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '18px 22px 14px 22px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '5px 14px 5px 10px',
+                borderRadius: 20,
+                background: 'rgba(51,112,255,0.08)',
+                border: '1px solid rgba(51,112,255,0.15)',
+              }}>
+                <MessageOutlined style={{ color: '#3370ff', fontSize: 12 }} />
+                <Text style={{ color: '#3370ff', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
+                  飞书推送
+                </Text>
+              </div>
+              <Text style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                移动端监测 · 机器人推送 + 指令查询
+              </Text>
+            </div>
+            <Tag color={feishuStatus?.configured ? 'green' : 'default'} style={{ marginRight: 0 }}>
+              {feishuStatus?.configured ? '已配置' : '未配置'}
+            </Tag>
+          </div>
+          <div style={{ padding: '0 22px 20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* App Secret 配置 */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <Input.Password
+                placeholder={feishuStatus?.app_secret_set ? '已设置 App Secret（输入新值可修改）' : '输入飞书 App Secret'}
+                value={feishuSecret}
+                onChange={e => setFeishuSecret(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <Button type="primary" loading={secretSaving} onClick={handleSaveSecret}>保存</Button>
+            </div>
+            {!feishuStatus?.configured ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="飞书机器人未配置"
+                description="请在上方输入 App Secret 并保存；保存后后端会自动重启生效。"
+                className="feishu-alert-warning"
+                />
+            ) : feishuStatus.bound ? (
+              <>
+                <Alert
+                  type="success"
+                  showIcon
+                  message={`已绑定飞书账号，推送${feishuStatus.push_enabled ? '已开启' : '已暂停'}`}
+                  description="在飞书中向机器人发送 /帮助 查看指令；/暂停 与 /恢复 控制全局推送开关。"
+                  className="feishu-alert-success"
+                />
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Button icon={<MessageOutlined />} onClick={handleGenerateBindCode} loading={bindCodeLoading}>
+                    重新生成绑定码
+                  </Button>
+                  <Button danger onClick={handleUnbind}>解绑</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="尚未绑定飞书"
+                  description="点击下方按钮生成绑定码，然后在飞书中向机器人发送 /绑定 <验证码> 完成关联。"
+                  className="feishu-alert-info"
+                />
+                <div>
+                  <Button type="primary" icon={<MessageOutlined />} onClick={handleGenerateBindCode} loading={bindCodeLoading}>
+                    生成绑定码
+                  </Button>
+                </div>
+              </>
+            )}
+            {bindCode && (
+              <div style={{
+                background: 'var(--surface-1)',
+                padding: '14px 18px', borderRadius: 12,
+                border: '1px solid var(--border)',
+              }}>
+                <Text style={{ color: 'var(--text-muted)', fontSize: 12 }}>绑定码（15 分钟内有效）</Text>
+                <div style={{ marginTop: 4, marginBottom: 4 }}>
+                  <Text copyable style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700, color: '#3370ff', letterSpacing: 2 }}>
+                    {bindCode}
+                  </Text>
+                </div>
+                <Text style={{ color: 'var(--text-muted)', fontSize: 12 }}>在飞书中向机器人发送：/绑定 {bindCode}</Text>
+              </div>
+            )}
+          </div>
+        </div>
+
+
+      {/* Scheduler */}
+      <div className="animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
         <div style={{
           background: 'var(--surface-0, #fff)',
           borderRadius: 16,
@@ -757,6 +932,8 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+      </div>
+
       </div>
     </div>
   )

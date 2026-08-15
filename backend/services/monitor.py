@@ -17,6 +17,7 @@ from models.comment import HotComment
 from crawlers import CRAWLER_MAP, WebsiteCrawler, OpenCLICrawler, get_router
 from crawlers.base import filter_posts, _run_crawler_in_thread
 from services.summarizer import summarizer
+from services.feishu import push_monitor_result
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             monitor_result.error_message = " | ".join(error_log) if error_log else (crawl_result.error_message if crawl_result else "所有爬取方式均失败")
             logger.error(f"[{target.account_name}] 所有爬虫失败: {monitor_result.error_message}")
             await db.commit()
+            await push_monitor_result("social_media", target.id)
             return
 
         # 评论改为按需获取：监控只抓帖子，用户在前端逐帖点击「获取评论」后才抓取并入库
@@ -143,6 +145,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
         )
         monitor_result.status = "success"
         await db.commit()
+        await push_monitor_result("social_media", target.id)
         logger.info(f"[{target.account_name}] === 监控完成 (结果ID: {monitor_result.id}) ===")
 
     except Exception as e:
@@ -150,6 +153,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
         monitor_result.error_message = str(e)
         logger.exception(f"[{target.account_name}] 监控异常")
         await db.commit()
+        await push_monitor_result("social_media", target.id)
 
 
 async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
@@ -183,6 +187,7 @@ async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
             monitor_result.status = "failed"
             monitor_result.error_message = crawl_result.error_message
             await db.commit()
+            await push_monitor_result("website", target.id)
             return
 
         content = crawl_result.posts[0].content if crawl_result.posts else ""
@@ -194,11 +199,13 @@ async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
         monitor_result.crawl_method = "playwright"
         monitor_result.status = "success"
         await db.commit()
+        await push_monitor_result("website", target.id)
 
     except Exception as e:
         monitor_result.status = "failed"
         monitor_result.error_message = str(e)
         await db.commit()
+        await push_monitor_result("website", target.id)
 
 
 async def monitor_all_active():

@@ -74,6 +74,14 @@ export const scheduleAPI = {
     api.post(`/schedule/run/${targetId}`, null, { params: { target_type: targetType } }),
 }
 
+// Feishu
+export const feishuAPI = {
+  status: () => api.get('/feishu/status'),
+  saveConfig: (data: { app_secret: string; app_id?: string; enabled?: boolean }) => api.put('/feishu/config', data),
+  bindCode: () => api.post('/feishu/bind-code'),
+  unbind: () => api.post('/feishu/unbind'),
+}
+
 // Settings — multi-provider
 export const settingsAPI = {
   getProvider: (provider: string) => api.get(`/settings/${provider}`),

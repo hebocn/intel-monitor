@@ -363,6 +363,10 @@ export default function WebsitesPage() {
           <Form.Item name="is_active" label="启用" valuePropName="checked" initialValue={true}>
             <Switch />
           </Form.Item>
+          <Form.Item name="push_enabled" label="飞书推送" valuePropName="checked" initialValue={true}
+            tooltip="监测完成后向绑定的飞书账号推送摘要/告警">
+            <Switch />
+          </Form.Item>
         </Form>
       </Modal>
     </div>
