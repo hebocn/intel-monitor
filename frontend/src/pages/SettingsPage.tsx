@@ -322,6 +322,7 @@ export default function SettingsPage() {
   const [bindCode, setBindCode] = useState<string | null>(null)
   const [bindCodeLoading, setBindCodeLoading] = useState(false)
   const [feishuSecret, setFeishuSecret] = useState('')
+  const [feishuAppId, setFeishuAppId] = useState('')
   const [secretSaving, setSecretSaving] = useState(false)
 
   const defaultState: ProviderState = {
@@ -396,12 +397,17 @@ export default function SettingsPage() {
     }
     setSecretSaving(true)
     try {
-      const res = await feishuAPI.saveConfig({ app_secret: feishuSecret.trim() })
+      const res = await feishuAPI.saveConfig({
+        app_secret: feishuSecret.trim(),
+        app_id: feishuAppId.trim() || undefined,
+      })
       setFeishuSecret('')
+      setFeishuAppId('')
       setFeishuStatus(prev => prev ? {
         ...prev,
         configured: res.data.configured,
         app_secret_set: true,
+        app_id: feishuAppId.trim() || prev.app_id,
       } : prev)
       if (res.data.reloading) {
         message.info('配置已保存，后端将自动重启生效（约 5 秒），期间页面可能短暂无响应')
@@ -755,6 +761,15 @@ export default function SettingsPage() {
             </Tag>
           </div>
           <div style={{ padding: '0 22px 20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* App ID 配置 */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <Input
+                placeholder={feishuStatus?.app_id ? `App ID: ${feishuStatus.app_id}（输入新值可修改）` : '输入飞书 App ID（如 cli_xxx）'}
+                value={feishuAppId}
+                onChange={e => setFeishuAppId(e.target.value)}
+                style={{ flex: 1 }}
+              />
+            </div>
             {/* App Secret 配置 */}
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <Input.Password
