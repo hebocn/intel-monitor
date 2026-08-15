@@ -79,8 +79,18 @@ CONTENT_FILTER_SYSTEM = (
 
 # ── AI call helper ──────────────────────────────────────────────────────────
 
-async def _call_deepseek(system_prompt: str, user_prompt: str, temperature: float = 0.7, timeout: int = 120) -> str:
-    """Call DeepSeek API (OpenAI compatible)."""
+async def _call_deepseek(
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.7,
+    timeout: int = 120,
+    max_tokens: int = 8192,
+) -> tuple[str, bool]:
+    """Call DeepSeek API (OpenAI compatible). Returns (content, truncated).
+
+    truncated=True 表示输出因达到 max_tokens 被截断（finish_reason=length），
+    调用方应据此降级（如回退草稿），避免把不完整内容当完整结果。
+    """
     if not settings.DEEPSEEK_API_KEY:
         raise RuntimeError("DEEPSEEK_API_KEY is not configured")
 
@@ -104,6 +114,7 @@ async def _call_deepseek(system_prompt: str, user_prompt: str, temperature: floa
                     {"role": "user", "content": user_prompt},
                 ],
                 "temperature": temperature,
+                "max_tokens": max_tokens,
             },
         )
         resp.raise_for_status()
@@ -117,7 +128,12 @@ async def _call_deepseek(system_prompt: str, user_prompt: str, temperature: floa
         choices = data.get("choices", [])
         if not choices:
             raise RuntimeError("DeepSeek returned no choices")
-        return choices[0]["message"]["content"]
+        content = choices[0]["message"]["content"]
+        finish_reason = choices[0].get("finish_reason")
+        truncated = finish_reason == "length"
+        if truncated:
+            logger.warning(f"DeepSeek output truncated (finish_reason=length), got {len(content)} chars")
+        return content, truncated
 
 
 def _safe_json_extract(text: str) -> str:
@@ -137,7 +153,7 @@ def _safe_json_extract(text: str) -> str:
 
 async def split_query(topic: str) -> list[dict]:
     """Phase 1: Split user topic into multiple search queries."""
-    result = await _call_deepseek(QUERY_SPLIT_SYSTEM, f"情报研究主题：\n{topic}", temperature=0.3, timeout=60)
+    result, _ = await _call_deepseek(QUERY_SPLIT_SYSTEM, f"情报研究主题：\n{topic}", temperature=0.3, timeout=60)
     try:
         queries = json.loads(_safe_json_extract(result))
         if isinstance(queries, list) and len(queries) > 0:
@@ -176,7 +192,7 @@ async def filter_sources(topic: str, sources: list[dict]) -> list[dict]:
         candidates_text = "\n\n".join(entries)
 
         try:
-            result = await _call_deepseek(CONTENT_FILTER_SYSTEM, f"研究主题：\n{topic}\n\n候选材料：\n{candidates_text}", temperature=0.3, timeout=90)
+            result, _ = await _call_deepseek(CONTENT_FILTER_SYSTEM, f"研究主题：\n{topic}\n\n候选材料：\n{candidates_text}", temperature=0.3, timeout=90)
             ratings = json.loads(_safe_json_extract(result))
             rating_map = {r["index"]: r for r in ratings if isinstance(r, dict) and "index" in r}
         except (json.JSONDecodeError, Exception) as e:
@@ -227,7 +243,7 @@ async def stage1_extract_facts(sources: list[dict]) -> dict:
         logger.info(f"Stage 1 batch {batch_start//MAX_SOURCES_PER_BATCH + 1}: {len(batch)} sources, {len(batch_text)} chars")
 
         try:
-            result = await _call_deepseek(STAGE1_SYSTEM, batch_text, temperature=0.3, timeout=180)
+            result, _ = await _call_deepseek(STAGE1_SYSTEM, batch_text, temperature=0.3, timeout=180)
             parsed = json.loads(_safe_json_extract(result))
             all_facts.extend(parsed.get("facts", []))
             all_data_points.extend(parsed.get("data_points", []))
@@ -279,7 +295,7 @@ async def stage2_write_sections(facts_data: dict, topic: str) -> str:
 
     chapters_json = ""
     try:
-        result = await _call_deepseek(STAGE2_SECTION_SYSTEM, chapter_prompt + f"\n\n主题：{topic}\n\n事实清单：\n{facts_text[:20000]}", temperature=0.5, timeout=90)
+        result, _ = await _call_deepseek(STAGE2_SECTION_SYSTEM, chapter_prompt + f"\n\n主题：{topic}\n\n事实清单：\n{facts_text[:20000]}", temperature=0.5, timeout=90)
         parsed = json.loads(_safe_json_extract(result))
         chapters = parsed.get("chapters", [])
     except Exception:
@@ -309,9 +325,13 @@ async def stage2_write_sections(facts_data: dict, topic: str) -> str:
             f"研究主题：{topic}"
         )
         try:
-            content = await _call_deepseek(STAGE2_SECTION_SYSTEM, ch_prompt, temperature=0.6, timeout=180)
+            content, truncated = await _call_deepseek(
+                STAGE2_SECTION_SYSTEM, ch_prompt, temperature=0.6, timeout=180, max_tokens=8192,
+            )
+            if truncated:
+                logger.warning(f"Stage 2 chapter '{ch["title"]}' truncated at {len(content)} chars")
             sections.append({"title": ch["title"], "content": content.strip()})
-            logger.info(f"Stage 2 wrote chapter: {ch['title']} ({len(content)} chars)")
+            logger.info(f"Stage 2 wrote chapter: {ch['title']} ({len(content)} chars, truncated={truncated})")
         except Exception as e:
             logger.error(f"Stage 2 failed on chapter {ch['title']}: {e}")
             sections.append({"title": ch["title"], "content": f"## {ch['title']}\n\n本章撰写失败: {e}"})
@@ -343,15 +363,21 @@ async def stage3_polish(draft: str, topic: str) -> str:
         "7. 输出完整的 Markdown 全文（不要截断），不要输出其他说明"
     )
     try:
-        polished = await _call_deepseek(
+        polished, truncated = await _call_deepseek(
             stage3_system,
             f"研究主题：{topic}\n\n报告草稿：\n{draft}",
             temperature=0.4,
             timeout=180,
+            max_tokens=8192,
         )
-        if polished and len(polished.strip()) > 500:
-            logger.info(f"Stage 3 completed: {len(polished)} chars")
-            return polished.strip()
+        if truncated:
+            logger.warning(f"Stage 3 output truncated ({len(polished)} chars), falling back to unpolished draft")
+        elif polished and len(polished.strip()) > 500:
+            if len(polished.strip()) < len(draft) * 0.5:
+                logger.warning(f"Stage 3 output suspiciously short ({len(polished)} vs draft {len(draft)}), using draft")
+            else:
+                logger.info(f"Stage 3 completed: {len(polished)} chars")
+                return polished.strip()
     except Exception as e:
         logger.error(f"Stage 3 failed: {e}")
 
