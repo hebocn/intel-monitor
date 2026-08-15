@@ -9,6 +9,9 @@ dist/
 .vite/
 *.db
 *.log
+# 临时调试脚本/截图
+backend/tests/_*.py
+intel-map/_*.jpeg
 .gstack/
 .agents/
 skills-lock.json
