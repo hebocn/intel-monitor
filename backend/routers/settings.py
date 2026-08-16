@@ -187,6 +187,16 @@ async def _test_key(provider: str, api_key: str) -> dict:
                 return {"success": False, "message": f"Firecrawl 返回异常: {data.get('warning', 'unknown')}"}
             if resp.status_code == 401:
                 return {"success": False, "message": "API Key 无效（认证失败）"}
+            if resp.status_code == 402:
+                # 402 Payment Required：通常是套餐额度用尽、免费额度未激活，
+                # 或该功能（如 search）不在当前套餐内
+                detail = ""
+                try:
+                    body = resp.json()
+                    detail = body.get("error") or body.get("message") or ""
+                except Exception:
+                    detail = resp.text[:200]
+                return {"success": False, "message": f"Firecrawl 402 套餐额度问题：{detail or '请到 Firecrawl 控制台检查账单/套餐额度'}"}
             return {"success": False, "message": f"Firecrawl HTTP {resp.status_code}"}
         except httpx.TimeoutException:
             return {"success": False, "message": "连接超时，请检查网络"}

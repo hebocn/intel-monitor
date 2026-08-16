@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 # ── Constants ──────────────────────────────────────────────────────────────
 
 MAX_CHARS_PER_BATCH = 25000  # ~6000 tokens per batch, safe for DeepSeek context
-MAX_SOURCES_PER_BATCH = 15
+MAX_SOURCES_PER_BATCH = 5  # 小上下文模型友好；输出截断时还会自动对半拆分重试
+MAX_SOURCE_CHARS = 1500  # 单条来源内容截断上限（15 条×3000 字符对 flash 类模型过大）
 
 # ── System prompts ─────────────────────────────────────────────────────────
 
@@ -103,20 +104,26 @@ async def _call_deepseek(
         "Content-Type": "application/json",
     }
 
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        # 关闭思考模式：报告流水线全是结构化任务，推理 token 会挤占
+        # max_tokens 输出预算（deepseek-v4-flash 曾因推理过长导致输出截断、
+        # JSON 解析失败、事实提取批次被静默丢弃）
+        "thinking": {"type": "disabled"},
+    }
+
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(
-            api_url,
-            headers=headers,
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-        )
+        resp = await client.post(api_url, headers=headers, json=payload)
+        if resp.status_code == 400 and "thinking" in (resp.text or "").lower():
+            # 端点/模型不支持 thinking 参数（如旧版或兼容层），去掉后重试
+            payload.pop("thinking", None)
+            resp = await client.post(api_url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
 
@@ -174,7 +181,7 @@ async def filter_sources(topic: str, sources: list[dict]) -> list[dict]:
         return sources
 
     # Batch filter to avoid exceeding DeepSeek context window
-    FILTER_BATCH_SIZE = 30  # ~30 sources per batch keeps text manageable
+    FILTER_BATCH_SIZE = 20  # ~20 sources per batch keeps text manageable (小上下文模型友好)
     all_filtered = []
 
     for batch_start in range(0, len(sources), FILTER_BATCH_SIZE):
@@ -213,6 +220,49 @@ async def filter_sources(topic: str, sources: list[dict]) -> list[dict]:
 
 # ── Stage 1: Facts Extraction ──────────────────────────────────────────────
 
+async def _extract_facts_batch(offset: int, batch: list[dict], depth: int = 0) -> tuple[list, list, list]:
+    """Extract facts from one batch; recursively split in half when output is truncated."""
+    batch_text_parts = []
+    for i, s in enumerate(batch):
+        md = (s.get("markdown") or s.get("content") or "")[:MAX_SOURCE_CHARS]
+        batch_text_parts.append(
+            f"### 来源 [{offset + i}]\n"
+            f"标题: {s.get('title', '无')}\n"
+            f"URL: {s.get('url', '')}\n"
+            f"内容:\n{md}"
+        )
+    batch_text = "\n\n".join(batch_text_parts)
+
+    if len(batch_text) > MAX_CHARS_PER_BATCH:
+        batch_text = batch_text[:MAX_CHARS_PER_BATCH]
+
+    logger.info(f"Stage 1 batch [{offset}:{offset + len(batch)}]: {len(batch)} sources, {len(batch_text)} chars, depth={depth}")
+
+    try:
+        result, truncated = await _call_deepseek(STAGE1_SYSTEM, batch_text, temperature=0.3, timeout=180)
+    except Exception as e:
+        logger.warning(f"Stage 1 batch [{offset}] API call failed: {e}")
+        return [], [], []
+
+    if truncated and len(batch) > 1 and depth < 3:
+        mid = len(batch) // 2
+        logger.warning(f"Stage 1 batch [{offset}] output truncated, splitting {len(batch)} -> {mid} + {len(batch) - mid}")
+        a = await _extract_facts_batch(offset, batch[:mid], depth + 1)
+        b = await _extract_facts_batch(offset + mid, batch[mid:], depth + 1)
+        return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+    try:
+        parsed = json.loads(_safe_json_extract(result))
+        return (
+            parsed.get("facts", []),
+            parsed.get("data_points", []),
+            parsed.get("relationships", []),
+        )
+    except Exception as e:
+        logger.warning(f"Stage 1 batch [{offset}] JSON parse failed (truncated={truncated}): {e}")
+        return [], [], []
+
+
 async def stage1_extract_facts(sources: list[dict]) -> dict:
     """Extract structured facts, data points, and relationships from all sources."""
     if not sources:
@@ -222,36 +272,13 @@ async def stage1_extract_facts(sources: list[dict]) -> dict:
     all_data_points = []
     all_relationships = []
 
-    # Batch sources to fit context
+    # Batch sources to fit context; truncated batches are split and retried
     for batch_start in range(0, len(sources), MAX_SOURCES_PER_BATCH):
         batch = sources[batch_start:batch_start + MAX_SOURCES_PER_BATCH]
-
-        batch_text_parts = []
-        for i, s in enumerate(batch):
-            md = (s.get("markdown") or s.get("content") or "")[:3000]
-            batch_text_parts.append(
-                f"### 来源 [{batch_start + i}]\n"
-                f"标题: {s.get('title', '无')}\n"
-                f"URL: {s.get('url', '')}\n"
-                f"内容:\n{md}"
-            )
-        batch_text = "\n\n".join(batch_text_parts)
-
-        if len(batch_text) > MAX_CHARS_PER_BATCH * 3:
-            batch_text = batch_text[:MAX_CHARS_PER_BATCH * 3]
-
-        logger.info(f"Stage 1 batch {batch_start//MAX_SOURCES_PER_BATCH + 1}: {len(batch)} sources, {len(batch_text)} chars")
-
-        try:
-            result, _ = await _call_deepseek(STAGE1_SYSTEM, batch_text, temperature=0.3, timeout=180)
-            parsed = json.loads(_safe_json_extract(result))
-            all_facts.extend(parsed.get("facts", []))
-            all_data_points.extend(parsed.get("data_points", []))
-            all_relationships.extend(parsed.get("relationships", []))
-        except json.JSONDecodeError as e:
-            logger.warning(f"Stage 1 JSON parse failed for batch: {e}")
-        except Exception as e:
-            logger.warning(f"Stage 1 batch failed: {e}")
+        facts, data_points, relationships = await _extract_facts_batch(batch_start, batch)
+        all_facts.extend(facts)
+        all_data_points.extend(data_points)
+        all_relationships.extend(relationships)
 
     # Deduplicate facts (by text similarity — simple prefix match)
     seen_texts = set()
@@ -295,7 +322,7 @@ async def stage2_write_sections(facts_data: dict, topic: str) -> str:
 
     chapters_json = ""
     try:
-        result, _ = await _call_deepseek(STAGE2_SECTION_SYSTEM, chapter_prompt + f"\n\n主题：{topic}\n\n事实清单：\n{facts_text[:20000]}", temperature=0.5, timeout=90)
+        result, _ = await _call_deepseek(STAGE2_SECTION_SYSTEM, chapter_prompt + f"\n\n主题：{topic}\n\n事实清单：\n{facts_text[:12000]}", temperature=0.5, timeout=90)
         parsed = json.loads(_safe_json_extract(result))
         chapters = parsed.get("chapters", [])
     except Exception:
@@ -321,7 +348,7 @@ async def stage2_write_sections(facts_data: dict, topic: str) -> str:
             f"请撰写以下章节：\n"
             f"章节标题：{ch['title']}\n"
             f"本章要点：{ch.get('brief', '')}\n\n"
-            f"可引用的基础事实：\n{facts_text[:15000]}\n\n"
+            f"可引用的基础事实：\n{facts_text[:12000]}\n\n"
             f"研究主题：{topic}"
         )
         try:
@@ -368,7 +395,7 @@ async def stage3_polish(draft: str, topic: str) -> str:
             f"研究主题：{topic}\n\n报告草稿：\n{draft}",
             temperature=0.4,
             timeout=180,
-            max_tokens=8192,
+            max_tokens=16384,
         )
         if truncated:
             logger.warning(f"Stage 3 output truncated ({len(polished)} chars), falling back to unpolished draft")
