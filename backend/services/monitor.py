@@ -181,7 +181,8 @@ async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
 
     try:
         crawler = WebsiteCrawler()
-        crawl_result = await _run_crawler_in_thread(crawler.crawl(target.url, target.css_selector))
+        crawl_result = await _run_crawler_in_thread(
+            crawler.crawl(target.url, target.css_selector), timeout=180)
 
         if not crawl_result.success:
             monitor_result.status = "failed"
@@ -196,7 +197,7 @@ async def _monitor_website_target(db: AsyncSession, target: WebsiteTarget):
 
         monitor_result.summary = summary
         monitor_result.raw_content = content[:10000]
-        monitor_result.crawl_method = "playwright"
+        monitor_result.crawl_method = crawl_result.method or "unknown"
         monitor_result.status = "success"
         await db.commit()
         await push_monitor_result("website", target.id)

@@ -44,6 +44,7 @@ class CrawlResult:
     raw_html: str = ""
     success: bool = True
     error_message: str = ""
+    method: str = ""  # 实际使用的爬取方法 (scrapling/opencli/autocli/playwright)
 
 
 
@@ -76,8 +77,11 @@ class PlaywrightCrawler(ABC):
         pass
 
 
-async def _run_crawler_in_thread(coro):
-    """Run a Playwright crawler coroutine in a thread with ProactorEventLoop on Windows."""
+async def _run_crawler_in_thread(coro, timeout: float | None = 300):
+    """Run a Playwright crawler coroutine in a thread with ProactorEventLoop on Windows.
+
+    timeout: 硬超时（秒），防止爬虫卡死永久阻塞任务（默认 300s）。
+    """
     if sys.platform == "win32":
         import concurrent.futures
 
@@ -85,12 +89,17 @@ async def _run_crawler_in_thread(coro):
             loop = asyncio.ProactorEventLoop()
             asyncio.set_event_loop(loop)
             try:
+                if timeout:
+                    return loop.run_until_complete(
+                        asyncio.wait_for(coro, timeout=timeout))
                 return loop.run_until_complete(coro)
             finally:
                 loop.close()
 
         with concurrent.futures.ThreadPoolExecutor() as pool:
             return await asyncio.get_event_loop().run_in_executor(pool, _run_in_proactor)
+    if timeout:
+        return await asyncio.wait_for(coro, timeout=timeout)
     return await coro
 
 
