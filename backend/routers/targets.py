@@ -1,7 +1,8 @@
 # intel-monitor/backend/routers/targets.py
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from auth import get_current_user
 from models.user import User
 from models.target import Target
 from schemas.target import TargetCreate, TargetUpdate, TargetResponse
+from services.importer import make_target_template, import_targets
 
 router = APIRouter(prefix="/api/targets", tags=["targets"])
 
@@ -128,3 +130,46 @@ async def delete_target(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target not found")
     await db.delete(target)
     await db.commit()
+
+
+# ── 批量导入 ─────────────────────────────────────────────
+
+@router.get("/import/template")
+async def download_target_template(user: User = Depends(get_current_user)):
+    """下载社交账号批量导入模板（xlsx，列名固定：平台 / 账号名称 / 账号URL）。"""
+    content = make_target_template()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="target_import_template.xlsx"'},
+    )
+
+
+@router.post("/import")
+async def import_targets_batch(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量导入社交账号（xlsx/xls/csv）。列名必须为：平台 / 账号名称 / 账号URL。"""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="上传文件为空")
+
+    try:
+        existing = (await db.execute(
+            select(Target.account_url).where(Target.user_id == user.id)
+        )).scalars().all()
+        existing_urls = {u.lower().rstrip("/") for u in existing if u}
+
+        result, items = import_targets(file.filename or "upload.xlsx", data, existing_urls)
+        for item in items:
+            db.add(Target(user_id=user.id, **item))
+        await db.commit()
+
+        return result.to_dict()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("[import] 社交账号批量导入失败")
+        raise HTTPException(status_code=500, detail=f"导入失败: {e}")

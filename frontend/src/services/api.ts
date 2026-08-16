@@ -40,6 +40,8 @@ export const targetsAPI = {
   update: (id: number, data: any) => api.put(`/targets/${id}`, data),
   delete: (id: number) => api.delete(`/targets/${id}`),
   runNow: (id: number) => api.post(`/schedule/run/${id}`, null, { params: { target_type: 'social_media' } }),
+  importTemplate: () => api.get('/targets/import/template', { responseType: 'blob' }),
+  importBatch: (formData: FormData) => api.post('/targets/import', formData, { timeout: 120000 }),
 }
 
 // Websites
@@ -48,6 +50,8 @@ export const websitesAPI = {
   create: (data: any) => api.post('/websites', data),
   update: (id: number, data: any) => api.put(`/websites/${id}`, data),
   delete: (id: number) => api.delete(`/websites/${id}`),
+  importTemplate: () => api.get('/websites/import/template', { responseType: 'blob' }),
+  importBatch: (formData: FormData) => api.post('/websites/import', formData, { timeout: 120000 }),
 }
 
 // Results
