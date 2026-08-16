@@ -18,7 +18,7 @@
 </linearGradient>
 </defs>
 <rect width="960" height="976" fill="#0B1120"/>
-<text x="40" y="34" class="ttl">Intel Monitor · 系统架构</text>
+<text x="40" y="34" class="ttl"><tspan fill="#f5f0eb">INTEL MONITOR</tspan><tspan fill="#34D399"> · 系统架构</tspan></text>
 <text x="40" y="54" class="sub">社交媒体情报监控平台 · FastAPI + React + SQLite + lark-oapi + Google CSE</text>
 <rect x="40" y="74" width="880" height="124" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
 <text x="58" y="104" class="lay">L1 · 接入层</text>
@@ -34,7 +34,7 @@
 <rect x="40" y="214" width="880" height="112" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
 <text x="58" y="244" class="lay">L2 · API 层</text>
 <rect x="320" y="254" width="320" height="58" rx="8" fill="#0f1f2e" stroke="#3b82f6" stroke-width="1.5"/>
-<text x="480" y="278" text-anchor="middle" class="nm">FastAPI 后端 · :8000</text>
+<text x="480" y="278" text-anchor="middle" class="nm">FastAPI 后端</text>
 <text x="480" y="298" text-anchor="middle" class="sn">15 组路由 · JWT 认证 · 监测 / 同步 / 报告 / 飞书</text>
 <rect x="40" y="342" width="880" height="130" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
 <text x="58" y="372" class="lay">L3 · 服务层</text>

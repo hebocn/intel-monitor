@@ -16,11 +16,11 @@
 
 ## 功能矩阵
 
-![功能矩阵](design-demos/功能图.png)
+<img src="design-demos/功能图.png" alt="功能矩阵" width="880">
 
 ## 架构速览
 
-![系统架构图](design-demos/架构图.png)
+<img src="design-demos/架构图.png" alt="系统架构图" width="880">
 
 ## 快速启动
 
