@@ -1,6 +1,6 @@
 # Intel Monitor — 社交媒体与网站监控平台
 
-自动化监控社交媒体账号动态和网站内容变化，多级爬虫降级链保障可用性，AI 驱动摘要、舆情分析和智能报告生成。
+自动化监控社交媒体账号动态和网站内容变化，多级爬虫降级链保障可用性，AI 驱动摘要、舆情分析和智能报告生成。支持飞书移动端推送与指令查询，随时随地在手机上查看监测结果。
 
 ## 核心亮点
 
@@ -10,52 +10,16 @@
 - **五阶段情报报告** — LLM 拆题 → 双轨搜索 → 相关度过滤 → 深度抓取 → 三段式 AI 写作，自动生成结构化报告
 - **跨平台舆情搜索** — 覆盖微博/抖音/小红书/头条/108社区/X/YouTube/Facebook/Telegram 九个平台
 - **十六平台热搜追踪** — 一键批量抓取微博/知乎/B站/百度/抖音/头条/小红书/HackerNews/GitHub 等平台热搜
+- **飞书移动端推送** — lark-oapi 长连接，监测完成自动推送到手机，支持 /绑定 /列表 /结果 /监测 等对话指令与卡片按钮
+- **社交账号同步存档** — x/微博账号一键按条数（1-10000）拉取正文存档，抽屉展示并可导出 Markdown / NDJSON
 
 ## 功能矩阵
 
-| 模块 | 能力 | 覆盖平台 |
-|------|------|----------|
-| **社交账号监控** | 定时抓取目标账号新帖，AI 摘要 + 热评提取 | 微博、X、小红书、抖音、YouTube、Bilibili、头条、108天台社区 |
-| **网站内容监控** | CSS 选择器提取网页指定区域，变更感知 | 任意网页 |
-| **舆情搜索** | 关键词实时搜索，影响力评分排序 | 微博、抖音、小红书、今日头条、108天台社区、X、YouTube、Facebook、Telegram |
-| **热门话题追踪** | 批量抓取热搜榜，一键刷新全部平台 | 微博、知乎、B站、百度、抖音、头条、小红书、HackerNews、GitHub 等 16 个平台 |
-| **智能报告** | 五阶段流水线自动生成图文情报报告，支持导出 | — |
-| **跨平台账号匹配** | 根据一个平台账号发现其他平台同名/相似账号 | 微博 ↔ X |
-| **YouTube 深度分析** | 音频下载 → 语音转文字 → AI 摘要 | YouTube |
+![功能矩阵](design-demos/feature-matrix.png)
 
 ## 架构速览
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    前端 (React + Ant Design)                      │
-│                    http://localhost:3000                          │
-└─────────────────────────────┬────────────────────────────────────┘
-                              │ HTTP/REST
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    FastAPI 后端 (Python 3.14)                     │
-│                    http://localhost:8000                          │
-│                                                                   │
-│  ┌──────────┐ ┌───────────┐ ┌──────────────┐ ┌───────────────┐  │
-│  │ 认证模块  │ │ 12 个路由  │ │ APScheduler  │ │   配置管理     │  │
-│  │ JWT+bcrypt│ │  REST API │ │  Cron 调度   │ │ AI/爬虫/提示词 │  │
-│  └──────────┘ └─────┬─────┘ └──────┬───────┘ └───────────────┘  │
-└─────────────────────┼──────────────┼─────────────────────────────┘
-                      │              │
-         ┌────────────┘              └────────────┐
-         ▼                                        ▼
-┌─────────────────────┐              ┌────────────────────────────┐
-│    爬虫降级链         │              │       AI 摘要服务           │
-│                      │              │                            │
-│  OpenCLI (复用登录态)  │              │  MiniMax / DeepSeek / MiMo  │
-│       ↓ 失败          │              │  多模态 (图片 + 文字)        │
-│  CDP Proxy (:3456)   │              │  三级降级 (模型→纯文本→原文)  │
-│       ↓ 失败          │              │                            │
-│  Scrapling (轻量)     │              └────────────────────────────┘
-│       ↓ 失败          │
-│  Playwright (全浏览器) │
-└─────────────────────┘
-```
+![系统架构图](design-demos/architecture.png)
 
 ## 快速启动
 
@@ -116,7 +80,17 @@ npm run dev
 | **MiMo**（小米） | `MIMO_API_KEY` | `MIMO_MODEL` |
 | AI 提供商切换 | `AI_PROVIDER` | `minimax` / `deepseek` / `mimo` |
 
-AI 摘要提示词可通过 Web 界面或 `/api/settings/prompts` 在线编辑，无需修改代码。
+AI 摘要提示词可通过 Web 界面或 `/api/settings/prompts` 在线编辑，无需修改代码。多行提示词以 `.env` 引号格式保存，重启不丢失。
+
+### 飞书推送（可选）
+
+| 变量 | 说明 |
+|------|------|
+| `FEISHU_ENABLED` | 是否启用飞书机器人（`true`/`false`） |
+| `FEISHU_APP_ID` | 飞书自建应用 App ID（`cli_` 开头） |
+| `FEISHU_APP_SECRET` | 飞书自建应用 App Secret |
+
+也可在 Web 端「系统设置 → 飞书推送」直接填写 App Secret 保存（自动写入 `.env` 并重启生效）。详见下方「飞书推送」章节。
 
 ### 可选服务
 
@@ -168,70 +142,45 @@ Playwright (全功能无头浏览器)
 | 今日头条 | | | ✅ | ✅ |
 | 108天台社区 | | | | ✅ |
 
-## 技术栈
+## 账号同步存档
 
-| 层 | 技术 |
-|----|------|
-| **后端框架** | Python 3.14, FastAPI, Uvicorn |
-| **数据库** | SQLite + SQLAlchemy (async) + aiosqlite |
-| **定时调度** | APScheduler（支持 cron 表达式） |
-| **前端** | React 18, Ant Design 5, Vite, TypeScript |
-| **AI 摘要** | MiniMax / DeepSeek / MiMo（可切换，支持多模态） |
-| **爬虫引擎** | OpenCLI, Chrome CDP, Scrapling, Playwright |
-| **语音转写** | yt-dlp + faster-whisper (YouTube 深度分析) |
-| **认证** | JWT (HS256) + bcrypt |
+对 x / 微博账号一键拉取正文存档（**纯拉取**：不生成 AI 摘要、不推送飞书），随时查看并导出：
 
-## 项目结构
+1. **触发** — 社交账号目标卡片点击 🔄 同步按钮，选择抓取条数（1-10000，快捷档 200 / 1.0k / 5.0k / 全部）
+2. **抓取** — 经 OpenCLI 复用 Chrome 登录态拉取账号最新帖子（x ≤ 10000 条、微博 ≤ 100 条，大条数自动分页节流）
+3. **存档** — 结果写入 `MonitorResult.raw_content`，同一账号多次同步保留多条历史记录
+4. **展示** — 右侧抽屉按「最近帖子」卡片展示（时间 + ID + 正文 + 互动数据 + 原帖链接）
+5. **导出** — 支持导出为 **Markdown**（含平台/账号/时间/正文/图片链接）或 **NDJSON**（每行一条完整 JSON）
+6. **历史回看** — 监测详情页记录列表显示「已同步 X 条帖子」，点击可重复查看与下载
 
-```
-intel-monitor/
-├── backend/
-│   ├── main.py              # FastAPI 入口，路由挂载
-│   ├── config.py            # 配置管理（Pydantic Settings）
-│   ├── database.py          # SQLite 异步引擎
-│   ├── auth.py              # JWT + bcrypt 认证
-│   ├── crawlers/            # 爬虫引擎（13 个爬虫 + 降级路由）
-│   │   ├── router.py        # 降级链调度器
-│   │   ├── base.py          # Playwright 爬虫基类 + 数据结构
-│   │   ├── opencli_crawler.py
-│   │   ├── cdp_crawler.py
-│   │   ├── douyin_scrapling_crawler.py
-│   │   └── ...              # 各平台 Playwright 爬虫
-│   ├── routers/             # REST API（12 个路由模块）
-│   │   ├── auth.py          # 认证
-│   │   ├── targets.py       # 监控目标 CRUD
-│   │   ├── results.py       # 抓取结果
-│   │   ├── sentiment.py     # 舆情搜索
-│   │   ├── intelligence.py  # 智能报告
-│   │   ├── hot_topics.py    # 热搜追踪
-│   │   ├── account_match.py # 跨平台账号匹配
-│   │   └── ...
-│   ├── services/            # 业务逻辑
-│   │   ├── monitor.py       # 核心监控逻辑
-│   │   ├── summarizer.py    # AI 摘要（多模型 + 图片分析）
-│   │   ├── scheduler.py     # APScheduler 封装
-│   │   ├── sentiment.py     # 舆情搜索引擎
-│   │   ├── scoring.py       # 影响力评分算法
-│   │   ├── intelligence.py  # 五阶段报告管线
-│   │   ├── report_writer.py # 三段式 AI 写作
-│   │   ├── youtube_deep.py  # YouTube 深度分析
-│   │   ├── account_matcher.py # 账号匹配算法
-│   │   └── ...
-│   └── models/              # SQLAlchemy 数据模型（13 个模型）
-├── frontend/
-│   └── src/
-│       ├── App.tsx          # 路由定义
-│       ├── pages/           # 页面组件（10 个页面）
-│       ├── components/      # 布局 + 公共组件
-│       └── services/        # API 客户端
-├── docs/                    # 详细设计文档
-│   ├── 项目介绍.md
-│   ├── data-fetching-architecture.md
-│   ├── development-guide.md
-│   └── ...
-├── .claude/                 # Claude Code Skills
-└── start.bat                # Windows 一键启动
-```
+## 飞书推送
+
+通过飞书自建应用机器人实现**移动端监测**：定时结果推送 + 对话式指令查询。
+
+### 启用步骤
+
+1. 在 [飞书开放平台](https://open.feishu.cn) 创建企业自建应用，获取 `App ID` / `App Secret`，开启机器人能力并添加 `im:message` 等权限
+2. 在 `backend/.env` 配置 `FEISHU_ENABLED=true` + `FEISHU_APP_ID` + `FEISHU_APP_SECRET`（或 Web 端「系统设置 → 飞书推送」直接填写）
+3. Web 端「系统设置 → 飞书推送」点击「生成绑定码」，在飞书中向机器人发送 `/绑定 <验证码>` 完成绑定
+4. 绑定后监测完成/失败会自动推送卡片到手机
+
+### 对话指令
+
+| 指令 | 作用 |
+|------|------|
+| `/绑定 <验证码>` | 绑定 Web 端生成的验证码（15 分钟有效） |
+| `/帮助` | 显示指令列表 |
+| `/列表` | 查看所有监测目标与最新状态 |
+| `/结果 <目标>` | 查看目标最新监测摘要（支持平台+账号，如 `X @用户名`） |
+| `/监测 <目标>` | 立即触发一次监测，完成自动推送 |
+| `/暂停` / `/恢复` | 全局推送开关 |
+
+### 实现要点
+
+- **通道**：lark-oapi 官方 SDK 长连接（WebSocket），无需公网回调 URL
+- **卡片**：飞书消息卡片 1.0（摘要 + 查看详情/立即监测/暂停推送按钮）
+- **开关**：目标级「飞书推送」开关 + 用户全局开关双重控制
+- **安全**：绑定码 64bit + 无效尝试限流，App Secret 仅管理员可改
 
 ## 舆情搜索模块
 
@@ -254,6 +203,84 @@ intel-monitor/
 阶段 5: 三段式 AI 写作   → 提取事实 JSON → 分章节写作 → 整合润色
 ```
 
+> 💡 报告生成已内置输出截断保护：`max_tokens=8192` + 截断检测，润色超限时自动回退完整草稿，避免"内容写一半"。
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| **后端框架** | Python 3.14, FastAPI, Uvicorn |
+| **数据库** | SQLite + SQLAlchemy (async) + aiosqlite |
+| **定时调度** | APScheduler（支持 cron 表达式） |
+| **前端** | React 18, Ant Design 5, Vite, TypeScript |
+| **情报地图** | intel-map（独立 Vite 应用）, Leaflet |
+| **AI 摘要** | MiniMax / DeepSeek / MiMo（可切换，支持多模态） |
+| **爬虫引擎** | OpenCLI, Chrome CDP, Scrapling, Playwright |
+| **Web 搜索** | Firecrawl, Tavily |
+| **飞书集成** | lark-oapi（WebSocket 长连接，消息卡片） |
+| **语音转写** | yt-dlp + faster-whisper (YouTube 深度分析) |
+| **认证** | JWT (HS256) + bcrypt |
+
+## 项目结构
+
+```
+intel-monitor/
+├── backend/
+│   ├── main.py              # FastAPI 入口，路由挂载
+│   ├── config.py            # 配置管理（Pydantic Settings）
+│   ├── database.py          # SQLite 异步引擎
+│   ├── auth.py              # JWT + bcrypt 认证
+│   ├── crawlers/            # 爬虫引擎（降级链路由）
+│   │   ├── router.py        # 降级链调度器
+│   │   ├── base.py          # Playwright 爬虫基类 + 数据结构
+│   │   ├── opencli_crawler.py
+│   │   ├── cdp_crawler.py
+│   │   ├── douyin_scrapling_crawler.py
+│   │   └── ...              # 各平台 Playwright 爬虫
+│   ├── routers/             # REST API（14 个路由模块）
+│   │   ├── auth.py          # 认证
+│   │   ├── targets.py       # 监控目标 CRUD
+│   │   ├── results.py       # 抓取结果
+│   │   ├── schedule.py      # 调度 + 立即执行 + 同步存档
+│   │   ├── sentiment.py     # 舆情搜索
+│   │   ├── intelligence.py  # 智能报告
+│   │   ├── hot_topics.py    # 热搜追踪
+│   │   ├── account_match.py # 跨平台账号匹配
+│   │   ├── feishu.py        # 飞书状态/配置/绑定
+│   │   └── ...
+│   ├── services/            # 业务逻辑
+│   │   ├── monitor.py       # 核心监控逻辑
+│   │   ├── summarizer.py    # AI 摘要（多模型 + 图片分析）
+│   │   ├── scheduler.py     # APScheduler 封装
+│   │   ├── sentiment.py     # 舆情搜索引擎
+│   │   ├── scoring.py       # 影响力评分算法
+│   │   ├── intelligence.py  # 五阶段报告管线
+│   │   ├── report_writer.py # 三段式 AI 写作
+│   │   ├── feishu.py        # 飞书机器人（长连接/指令/卡片/推送）
+│   │   ├── firecrawl_service.py / tavily_service.py  # Web 搜索
+│   │   ├── youtube_deep.py  # YouTube 深度分析
+│   │   ├── account_matcher.py # 账号匹配算法
+│   │   └── ...
+│   └── models/              # SQLAlchemy 数据模型（14 个模型）
+├── frontend/
+│   └── src/
+│       ├── App.tsx          # 路由定义
+│       ├── pages/           # 页面组件（12 个页面）
+│       ├── components/      # 布局 + 公共组件
+│       └── services/        # API 客户端
+├── intel-map/               # 情报地图（Leaflet 独立应用，/neo/）
+├── docs/                    # 详细设计文档
+│   ├── system-architecture.md
+│   ├── architecture-diagram.md
+│   ├── c4-container-diagram.md
+│   ├── 项目介绍.md
+│   ├── data-fetching-architecture.md
+│   ├── development-guide.md
+│   └── ...
+├── .claude/                 # Claude Code Skills
+└── start.bat                # Windows 一键启动
+```
+
 ## 常见问题
 
 **Q: 为什么小红书/抖音搜索不到？**
@@ -268,8 +295,17 @@ A: 降级链最终会落到 Playwright。确保 `playwright` 已安装（`pip in
 **Q: 如何新增监控平台？**
 A: 参考 [开发指南](docs/development-guide.md)，继承 `PlaywrightCrawler` 基类实现平台爬虫，在 `crawlers/__init__.py` 中注册即可。
 
+**Q: 飞书没有收到推送？**
+A: 依次检查：① 目标编辑表单的「飞书推送」开关是否开启；② 是否发过 `/暂停`（发 `/恢复` 解除）；③ Web 端「系统设置 → 飞书推送」是否显示"已配置 + 已绑定"；④ 后端日志是否报 `发送消息失败`（卡片格式/权限问题）。
+
+**Q: 账号同步超时？**
+A: 同步请求单独设置了 600 秒超时（选"全部"10000 条时约需 2-5 分钟）；确认 Chrome 已登录目标平台，OpenCLI 可用。
+
 ## 文档
 
+- [系统架构](docs/system-architecture.md) — 平台全貌：分层架构、采集链路、AI 能力、飞书集成、设计决策
+- [架构图](docs/architecture-diagram.md) — Mermaid 架构总览 + 核心数据流时序图
+- [C4 容器图](docs/c4-container-diagram.md) — C4 模型容器图层级架构图
 - [项目介绍](docs/项目介绍.md) — 完整功能概览与痛点分析
 - [数据抓取架构](docs/data-fetching-architecture.md) — 爬虫降级链、平台适配器设计
 - [数据抓取详解](docs/data-fetching-detailed.md) — 各平台选择器、API、边界情况

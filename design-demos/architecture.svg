@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 880" width="960" height="880">
+<style>
+  text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'SimHei', sans-serif; }
+  .ttl  { font-size: 22px; font-weight: 700; fill: #f5f0eb; }
+  .sub  { font-size: 11px; fill: #94a3b8; }
+  .lay  { font-size: 12px; font-weight: 700; letter-spacing: 2px; fill: #34D399; }
+  .nm   { font-size: 14px; font-weight: 600; fill: #f3f6fb; }
+  .sn   { font-size: 10.5px; fill: #94a3b8; }
+  .al   { font-size: 10.5px; fill: #aab6ca; }
+</style>
+<defs>
+<marker id="arr-rest" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,9 3,0 6" fill="#3b82f6"/></marker>
+<marker id="arr-ws" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,9 3,0 6" fill="#22d3ee"/></marker>
+<marker id="arr-ai" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,9 3,0 6" fill="#a78bfa"/></marker>
+<marker id="arr-async" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,9 3,0 6" fill="#94a3b8"/></marker>
+<linearGradient id="dbG" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#1a2e24"/><stop offset="1" stop-color="#0d1f16"/>
+</linearGradient>
+</defs>
+<rect width="960" height="880" fill="#0B1120"/>
+<text x="40" y="34" class="ttl">Intel Monitor · 系统架构</text>
+<text x="40" y="54" class="sub">社交媒体情报监控平台 · FastAPI + React + SQLite + lark-oapi</text>
+<rect x="40" y="74" width="880" height="124" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="104" class="lay">L1 · 接入层</text>
+<rect x="70" y="118" width="230" height="66" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="185.0" y="144" text-anchor="middle" class="nm">前端 SPA</text>
+<text x="185.0" y="162" text-anchor="middle" class="sn">React 18 · AntD 5 · Vite · :3000</text>
+<rect x="365" y="118" width="230" height="66" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="480.0" y="144" text-anchor="middle" class="nm">情报地图</text>
+<text x="480.0" y="162" text-anchor="middle" class="sn">intel-map · Leaflet · :3001 /neo/</text>
+<rect x="660" y="118" width="230" height="66" rx="8" fill="#111827" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="775.0" y="144" text-anchor="middle" class="nm">飞书用户</text>
+<text x="775.0" y="162" text-anchor="middle" class="sn">移动端 · 指令 / 卡片</text>
+<rect x="40" y="214" width="880" height="112" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="244" class="lay">L2 · API 层</text>
+<rect x="320" y="254" width="320" height="58" rx="8" fill="#0f1f2e" stroke="#3b82f6" stroke-width="1.5"/>
+<text x="480" y="278" text-anchor="middle" class="nm">FastAPI 后端 · :8000</text>
+<text x="480" y="298" text-anchor="middle" class="sn">14 组路由 · JWT 认证 · 监测 / 同步 / 报告 / 飞书</text>
+<rect x="40" y="342" width="880" height="130" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="372" class="lay">L3 · 服务层</text>
+<rect x="55" y="386" width="200" height="74" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="155.0" y="412" text-anchor="middle" class="nm">监测编排</text>
+<text x="155.0" y="430" text-anchor="middle" class="sn">monitor · scheduler</text>
+<text x="155.0" y="445" text-anchor="middle" class="sn">execute_monitor</text>
+<rect x="275" y="386" width="200" height="74" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="375.0" y="412" text-anchor="middle" class="nm">AI 摘要</text>
+<text x="375.0" y="430" text-anchor="middle" class="sn">summarizer · 多模态</text>
+<text x="375.0" y="445" text-anchor="middle" class="sn">MiniMax / DeepSeek / MiMo</text>
+<rect x="495" y="386" width="200" height="74" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="595.0" y="412" text-anchor="middle" class="nm">情报报告</text>
+<text x="595.0" y="430" text-anchor="middle" class="sn">intelligence · 五阶段</text>
+<text x="595.0" y="445" text-anchor="middle" class="sn">report_writer</text>
+<rect x="715" y="386" width="200" height="74" rx="8" fill="#111827" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="815.0" y="412" text-anchor="middle" class="nm">飞书机器人</text>
+<text x="815.0" y="430" text-anchor="middle" class="sn">feishu · lark-oapi</text>
+<text x="815.0" y="445" text-anchor="middle" class="sn">长连接 · 指令 / 卡片</text>
+<rect x="40" y="488" width="880" height="130" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="518" class="lay">L4 · 采集层 · 降级链</text>
+<rect x="55" y="532" width="200" height="74" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="155.0" y="558" text-anchor="middle" class="nm">OpenCLI</text>
+<text x="155.0" y="576" text-anchor="middle" class="sn">复用 Chrome 登录态</text>
+<text x="155.0" y="591" text-anchor="middle" class="sn">x · weibo · 小红书</text>
+<rect x="275" y="532" width="200" height="74" rx="8" fill="#111827" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="375.0" y="558" text-anchor="middle" class="nm">CDP</text>
+<text x="375.0" y="576" text-anchor="middle" class="sn">直连 Chrome :9222</text>
+<text x="375.0" y="591" text-anchor="middle" class="sn">WebSocket</text>
+<rect x="495" y="532" width="200" height="74" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="595.0" y="558" text-anchor="middle" class="nm">Scrapling</text>
+<text x="595.0" y="576" text-anchor="middle" class="sn">轻量 HTTP</text>
+<text x="595.0" y="591" text-anchor="middle" class="sn">头条</text>
+<rect x="715" y="532" width="200" height="74" rx="8" fill="#111827" stroke="#34D399" stroke-width="1.5"/>
+<text x="815.0" y="558" text-anchor="middle" class="nm">Playwright</text>
+<text x="815.0" y="576" text-anchor="middle" class="sn">全功能无头浏览器</text>
+<text x="815.0" y="591" text-anchor="middle" class="sn">x · youtube · douyin</text>
+<rect x="40" y="634" width="880" height="116" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="664" class="lay">L5 · 数据层</text>
+<ellipse cx="480" cy="678" rx="130.0" ry="12" fill="url(#dbG)" stroke="#2D6A4F" stroke-width="1.5"/>
+<rect x="350.0" y="678" width="260" height="58" fill="url(#dbG)" stroke="none"/>
+<line x1="350.0" y1="678" x2="350.0" y2="736" stroke="#2D6A4F" stroke-width="1.5"/>
+<line x1="610.0" y1="678" x2="610.0" y2="736" stroke="#2D6A4F" stroke-width="1.5"/>
+<ellipse cx="480" cy="736" rx="130.0" ry="12" fill="#1a2e24" stroke="#2D6A4F" stroke-width="1.5"/>
+<text x="480" y="702" text-anchor="middle" class="nm">SQLite</text>
+<text x="480" y="720" text-anchor="middle" class="sn">intel_monitor.db · 14 个数据模型</text>
+<rect x="40" y="766" width="880" height="106" rx="10" fill="none" stroke="#2D6A4F" stroke-width="1" stroke-dasharray="7,5" opacity="0.55"/>
+<text x="58" y="796" class="lay">外部依赖</text>
+<rect x="60" y="810" width="156" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1.5"/>
+<text x="138.0" y="836" text-anchor="middle" class="nm">Chrome CDP :9222</text>
+<text x="138.0" y="854" text-anchor="middle" class="sn">登录态 · WebSocket</text>
+<rect x="232" y="810" width="156" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1.5"/>
+<text x="310.0" y="836" text-anchor="middle" class="nm">OpenCLI / AutoCLI</text>
+<text x="310.0" y="854" text-anchor="middle" class="sn">CLI 子进程</text>
+<rect x="404" y="810" width="156" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1.5"/>
+<text x="482.0" y="836" text-anchor="middle" class="nm">AI 提供商</text>
+<text x="482.0" y="854" text-anchor="middle" class="sn">OpenAI 兼容 REST</text>
+<rect x="576" y="810" width="156" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1.5"/>
+<text x="654.0" y="836" text-anchor="middle" class="nm">Firecrawl / Tavily</text>
+<text x="654.0" y="854" text-anchor="middle" class="sn">Web 搜索 API</text>
+<rect x="748" y="810" width="156" height="50" rx="8" fill="#111827" stroke="#64748b" stroke-width="1.5"/>
+<text x="826.0" y="836" text-anchor="middle" class="nm">飞书开放平台</text>
+<text x="826.0" y="854" text-anchor="middle" class="sn">消息 API · WebSocket</text>
+<polyline points="185,184 185,254" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-rest)"/>
+<text x="163" y="222" text-anchor="middle" class="al" fill="#3b82f6">REST</text>
+<polyline points="480,184 480,254" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-rest)"/>
+<polyline points="775,184 775,254" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-async)"/>
+<polyline points="480,312 480,348 155,348 155,386" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-rest)"/>
+<text x="317" y="340" text-anchor="middle" class="al" fill="#3b82f6">委托</text>
+<polyline points="480,312 480,386" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-rest)"/>
+<polyline points="480,312 480,348 595,348 595,386" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr-rest)"/>
+<polyline points="480,312 480,348 815,348 815,386" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-ws)"/>
+<polyline points="155,460 155,532" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr-async)"/>
+<text x="133" y="498" text-anchor="middle" class="al" fill="#94a3b8">调度</text>
+<polyline points="480,606 480,660" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr-async)"/>
+<text x="500" y="636" text-anchor="middle" class="al" fill="#94a3b8">写入</text>
+<polyline points="915,423 940,423 940,700 826,700 826,810" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-ws)"/>
+<polyline points="826,810 826,700 940,700 940,423 915,423" fill="none" stroke="#22d3ee" stroke-width="1.5" opacity="0.55" marker-start="url(#arr-ws)"/>
+<text x="880" y="688" text-anchor="middle" class="al" fill="#22d3ee">WebSocket 长连接</text>
+</svg>

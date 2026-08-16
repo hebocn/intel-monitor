@@ -14,6 +14,9 @@ from services.report_writer import split_query, filter_sources, run_report_write
 
 logger = logging.getLogger(__name__)
 
+# 单个查询的搜索任务超时（秒）：覆盖 Firecrawl 重试 + Playwright 降级的最坏情况
+SEARCH_TASK_TIMEOUT = 120
+
 # ── Constants ──────────────────────────────────────────────────────────────
 
 WEB_SEARCH_PLATFORMS = {
@@ -216,10 +219,15 @@ async def _search_all(
             if platform == "x" and "firecrawl" in engines:
                 tasks.append(_search_web(query + " site:x.com", ["firecrawl"], max_results))
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 每个查询的引擎+平台任务加超时：Playwright 降级可能无限挂起，
+        # 无超时会让整个搜索阶段永远卡住（asyncio.gather 等待最慢任务）。
+        results = await asyncio.gather(
+            *[asyncio.wait_for(t, timeout=SEARCH_TASK_TIMEOUT) for t in tasks],
+            return_exceptions=True,
+        )
         for i, r in enumerate(results):
             if isinstance(r, Exception):
-                logger.warning(f"Search task error: {r}")
+                logger.warning(f"Search task error/timeout: {r}")
             elif isinstance(r, list):
                 for item in r:
                     url = item.get("url", "")

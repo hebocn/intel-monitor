@@ -36,10 +36,15 @@ async def search_weibo_via_autocli(keyword: str, limit: int = 20) -> CrawlResult
         return CrawlResult(success=False, error_message="autocli 未安装，微博搜索不可用")
 
     def _run():
-        return subprocess.run(
-            [_AUTOCLI_PATH, "weibo", "search", keyword, "--format", "json", "--limit", str(limit)],
-            capture_output=True, timeout=120,
-        )
+        # npm 全局 CLI 在 Windows 下是 .cmd/.bat shim，直接 subprocess 执行会报
+        # WinError 193（不是有效 Win32 程序），需经 cmd /c 调用
+        if _AUTOCLI_PATH and _AUTOCLI_PATH.lower().endswith((".cmd", ".bat")):
+            args = ["cmd", "/c", _AUTOCLI_PATH, "weibo", "search", keyword,
+                    "--format", "json", "--limit", str(limit)]
+        else:
+            args = [_AUTOCLI_PATH, "weibo", "search", keyword,
+                    "--format", "json", "--limit", str(limit)]
+        return subprocess.run(args, capture_output=True, timeout=120)
 
     try:
         proc = await asyncio.to_thread(_run)
