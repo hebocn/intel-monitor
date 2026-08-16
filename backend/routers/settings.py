@@ -125,12 +125,22 @@ def _read_env() -> dict[str, str]:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
+                v = v.strip()
+                # dotenv 标准格式：KEY="..." —— json.loads 还原全部转义（\n、\"、\\ 等）
+                if len(v) >= 2 and v.startswith('"') and v.endswith('"'):
+                    try:
+                        import json
+                        v = json.loads(v)
+                    except Exception:
+                        v = v[1:-1]
+                env[k.strip()] = v
     return env
 
 
 def _write_env(env: dict[str, str]):
-    lines = [f"{k}={v}" for k, v in env.items()]
+    import json
+    # json.dumps 生成 "..." 带引号 + \n 转义的标准 dotenv 值，多行提示词可完整保存/还原
+    lines = [f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in env.items()]
     ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
