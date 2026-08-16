@@ -109,6 +109,10 @@ export default function IntelligenceReportPage() {
       setActiveReportId(report_id)
       message.success('报告生成任务已启动')
       loadReports()
+      // 自动打开详情弹窗,实时展示生成进度
+      const detail = await intelligenceAPI.getReport(report_id)
+      setSelectedReport(detail.data)
+      setModalOpen(true)
       // Start polling
       startPolling(report_id)
     } catch (e: any) {
@@ -126,6 +130,8 @@ export default function IntelligenceReportPage() {
         const res = await intelligenceAPI.getReport(reportId)
         const r = res.data as ReportDetail
         setSelectedReport(r)
+        // 同步刷新列表,让状态 Tag(排队/搜索/抓取/撰写…)实时更新
+        loadReports()
         if (r.status === 'completed' || r.status === 'failed') {
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
           loadReports()

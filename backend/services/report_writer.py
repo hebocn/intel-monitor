@@ -415,8 +415,16 @@ async def stage3_polish(draft: str, topic: str) -> str:
 
 # ── Main pipeline ───────────────────────────────────────────────────────────
 
-async def run_report_writer(topic: str, sources: list[dict]) -> str:
-    """Execute the full three-stage AI pipeline and return final markdown report."""
+async def run_report_writer(
+    topic: str,
+    sources: list[dict],
+    progress_cb=None,
+) -> str:
+    """Execute the full three-stage AI pipeline and return final markdown report.
+
+    progress_cb: optional async callable(message: str) invoked between stages
+    so callers (e.g. report generation) can surface fine-grained progress.
+    """
     if not sources:
         return (
             "# 战略情报报告\n\n"
@@ -435,8 +443,14 @@ async def run_report_writer(topic: str, sources: list[dict]) -> str:
     if not facts.get("facts") and not facts.get("data_points"):
         logger.warning("No facts extracted from sources")
 
+    if progress_cb:
+        await progress_cb("AI 正在撰写报告（阶段 2/3：逐章撰写）...")
+
     # Stage 2: Chapter writing
     draft = await stage2_write_sections(facts, topic)
+
+    if progress_cb:
+        await progress_cb("AI 正在撰写报告（阶段 3/3：统稿润色）...")
 
     # Stage 3: Polish
     final = await stage3_polish(draft, topic)

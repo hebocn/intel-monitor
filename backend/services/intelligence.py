@@ -362,11 +362,14 @@ async def run_report_generation(
         filtered = await _deep_scrape_sources(filtered, engines, report_id)
 
         # ── Phase 4: AI Pipeline ──
+        async def _writing_progress(message: str):
+            await _update_progress(report_id, "writing", "writing", message)
+
         await _update_progress(report_id, "writing", "writing",
                                f"AI 正在撰写报告（阶段 1/3：事实提取）...")
         logger.info(f"Report {report_id}: starting AI pipeline with {len(filtered)} sources")
 
-        final_markdown = await run_report_writer(topic, filtered)
+        final_markdown = await run_report_writer(topic, filtered, progress_cb=_writing_progress)
 
         # ── Phase 5: Complete ──
         # Clean sources for storage (remove large markdown for storage efficiency,

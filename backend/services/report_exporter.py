@@ -165,17 +165,16 @@ async def export_to_docx(title: str, markdown: str) -> bytes:
 
 
 async def export_to_pdf(title: str, markdown: str) -> bytes:
-    """Convert markdown report to PDF bytes.
+    """Convert markdown report to real PDF bytes.
 
-    Uses a simple approach: convert markdown → HTML → inline PDF via print-friendly HTML.
-    For production, consider using weasyprint or a headless browser.
+    Renders print-friendly HTML via headless Chrome (--print-to-pdf), which
+    reuses the system Chrome install (same binary used by CDP/Playwright)
+    and gives correct CJK rendering. Falls back to raw HTML bytes only if
+    Chrome cannot be located (caller still receives printable content).
     """
-    # Simple HTML converter for basic PDF rendering
-    html = _markdown_to_simple_html(title, markdown)
-    # Return HTML as bytes — caller can render in browser and print to PDF
-    # For actual PDF generation, we'd need weasyprint or wkhtmltopdf
-    # For now, wrap in a minimal PDF-like HTML that browsers can print
     from datetime import datetime
+
+    html = _markdown_to_simple_html(title, markdown)
     html_with_print = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -197,8 +196,76 @@ async def export_to_pdf(title: str, markdown: str) -> bytes:
 <p class="meta" style="margin-top:40pt;">报告生成时间：{datetime.now().strftime('%Y年%m月%d日 %H:%M')} · 情报监测平台</p>
 </body>
 </html>"""
-    logger.info(f"Generated print-ready HTML for PDF: {title}")
-    return html_with_print.encode("utf-8")
+
+    chrome = _find_chrome()
+    if not chrome:
+        logger.warning("Chrome not found for PDF export — returning HTML bytes instead")
+        return html_with_print.encode("utf-8")
+
+    import asyncio
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    def _render() -> bytes:
+        tmpdir = tempfile.mkdtemp(prefix="intel_report_")
+        try:
+            html_path = os.path.join(tmpdir, "report.html")
+            pdf_path = os.path.join(tmpdir, "report.pdf")
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html_with_print)
+            cmd = [
+                chrome,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-sandbox",
+                "--no-pdf-header-footer",
+                f"--print-to-pdf={pdf_path}",
+                "file:///" + html_path.replace("\\", "/"),
+            ]
+            proc = subprocess.run(cmd, capture_output=True, timeout=60)
+            if proc.returncode != 0 or not os.path.exists(pdf_path):
+                raise RuntimeError(
+                    f"chrome print-to-pdf failed (rc={proc.returncode}): "
+                    f"{proc.stderr.decode('utf-8', errors='ignore')[-300:]}"
+                )
+            with open(pdf_path, "rb") as f:
+                data = f.read()
+            if not data.startswith(b"%PDF"):
+                raise RuntimeError("chrome output is not a valid PDF")
+            return data
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    try:
+        pdf_bytes = await asyncio.to_thread(_render)
+        logger.info(f"Exported pdf: {title} ({len(pdf_bytes)} bytes)")
+        return pdf_bytes
+    except Exception as e:
+        logger.warning(f"PDF render failed ({e}) — falling back to HTML bytes")
+        return html_with_print.encode("utf-8")
+
+
+def _find_chrome() -> str | None:
+    """Locate a Chrome/Chromium executable, or None."""
+    import os
+    import shutil
+
+    candidates = [
+        os.environ.get("CHROME_PATH", ""),
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    ]
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c
+    for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
 
 
 def _markdown_to_simple_html(title: str, md: str) -> str:
