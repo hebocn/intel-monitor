@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db, engine
-from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu
+from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu, facebook
 from services.scheduler import setup_scheduler, refresh_jobs
 from services.feishu import start_feishu_client, stop_feishu_client
 
@@ -206,6 +206,7 @@ app.include_router(intelligence.router)
 app.include_router(account_match.router)
 app.include_router(weather.router)
 app.include_router(feishu.router)
+app.include_router(facebook.router)
 
 # Serve frontend static files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"

@@ -17,6 +17,7 @@ from crawlers.cdp_crawler import build_cdp_entry
 from crawlers.claude_crawler import build_claude_entry
 from crawlers.toutiao_scrapling_crawler import ToutiaoScraplingCrawler
 from crawlers.douyin_scrapling_crawler import DouyinScraplingCrawler
+from crawlers.facebook_crawler import FacebookCrawler
 
 CRAWLER_MAP = {
     "x": XCrawler,
@@ -26,6 +27,7 @@ CRAWLER_MAP = {
     "weibo": WeiboCrawler,
     "toutiao": ToutiaoCrawler,
     "108community": Tiantai108Crawler,
+    "facebook": FacebookCrawler,
 }
 
 _router: CrawlerRouter | None = None
@@ -104,6 +106,7 @@ __all__ = [
     "filter_posts", "_run_crawler_in_thread",
     "XCrawler", "YouTubeCrawler", "XiaoHongShuCrawler", "DouyinCrawler",
     "WeiboCrawler", "ToutiaoCrawler", "Tiantai108Crawler",
+    "FacebookCrawler",
     "WebsiteCrawler", "OpenCLICrawler",
     "ToutiaoScraplingCrawler", "DouyinScraplingCrawler",
     "CRAWLER_MAP",

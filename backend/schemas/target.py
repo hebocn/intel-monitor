@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class TargetCreate(BaseModel):
-    platform: str = Field(..., pattern="^(x|youtube|xiaohongshu|douyin|weibo|toutiao|108community)$")
+    platform: str = Field(..., pattern="^(x|youtube|xiaohongshu|douyin|weibo|toutiao|108community|facebook)$")
     importance: Optional[str] = Field(None, pattern="^(high|medium|low)$")
     account_name: str = Field(..., min_length=1, max_length=100)
     account_url: str = Field(..., max_length=500)

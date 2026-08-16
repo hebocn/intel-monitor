@@ -25,7 +25,7 @@ TARGET_COLUMNS = ["平台", "账号名称", "账号URL"]
 SUPPORTED_EXTS = {".xlsx", ".xls", ".csv"}
 
 # 社交账号合法平台
-PLATFORMS = ("x", "youtube", "xiaohongshu", "douyin", "weibo", "toutiao", "108community")
+PLATFORMS = ("x", "youtube", "xiaohongshu", "douyin", "weibo", "toutiao", "108community", "facebook")
 PLATFORM_ALIASES = {
     "x": "x", "twitter": "x", "推特": "x",
     "youtube": "youtube", "油管": "youtube", "youtube.com": "youtube",
@@ -34,6 +34,7 @@ PLATFORM_ALIASES = {
     "weibo": "weibo", "微博": "weibo", "sina": "weibo",
     "toutiao": "toutiao", "头条": "toutiao", "今日头条": "toutiao",
     "108community": "108community", "108": "108community", "108社区": "108community", "天台社区": "108community",
+    "facebook": "facebook", "fb": "facebook", "脸书": "facebook",
 }
 
 _URL_SCHEME_RE = re.compile(r"^https?://", re.IGNORECASE)

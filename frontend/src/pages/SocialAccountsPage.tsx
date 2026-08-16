@@ -7,7 +7,7 @@ import {
   SearchOutlined,
   UploadOutlined, FileExcelOutlined,
 } from '@ant-design/icons'
-import { targetsAPI, scheduleAPI, resultsAPI } from '../services/api'
+import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
 
 const { Text } = Typography
@@ -20,6 +20,7 @@ const platformOptions = [
   { value: 'weibo', label: '微博', color: '#E6162D' },
   { value: 'toutiao', label: '今日头条', color: '#E53333' },
   { value: '108community', label: '108社区', color: '#2563EB' },
+  { value: 'facebook', label: 'Facebook', color: '#1877F2' },
 ]
 
 const importanceOptions = [
@@ -153,7 +154,7 @@ function AccountCard({
               style={{ color: '#0f766e' }}
             />
           </Tooltip>
-          {(target.platform === 'x' || target.platform === 'weibo') && (
+          {(target.platform === 'x' || target.platform === 'weibo' || target.platform === 'facebook') && (
             <Tooltip title="同步（拉取正文存档，可选条数）">
               <Button
                 type="text"
@@ -271,6 +272,40 @@ export default function SocialAccountsPage() {
   const navigate = useNavigate()
   const [scheduleMode, setScheduleMode] = useState<'simple' | 'cron'>('simple')
   const [cronExpressions, setCronExpressions] = useState<string[]>([''])
+  // Facebook 昵称反查候选
+  const [fbSearching, setFbSearching] = useState(false)
+  const [fbCandidates, setFbCandidates] = useState<{ nickname: string; url: string; snippet?: string }[]>([])
+  const [fbSearchOpen, setFbSearchOpen] = useState(false)
+  const fbPlatform = Form.useWatch('platform', form) === 'facebook'
+
+  const handleFbSearch = async () => {
+    const nickname = form.getFieldValue('account_name')
+    if (!nickname || !nickname.trim()) {
+      message.warning('请先填写账号名称（昵称）再搜索')
+      return
+    }
+    setFbSearching(true)
+    try {
+      const res = await facebookAPI.searchAccounts(nickname.trim())
+      const candidates = res.data?.candidates || []
+      if (candidates.length === 0) {
+        message.warning('未找到匹配的 Facebook 主页，请检查昵称或改用 URL 直接添加')
+        return
+      }
+      setFbCandidates(candidates)
+      setFbSearchOpen(true)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '搜索失败')
+    } finally {
+      setFbSearching(false)
+    }
+  }
+
+  const handleFbPick = (c: { nickname: string; url: string }) => {
+    form.setFieldsValue({ account_name: c.nickname, account_url: c.url })
+    setFbSearchOpen(false)
+    message.success('已填充账号信息，可继续设置调度')
+  }
 
   const fetchTargets = async () => {
     setLoading(true)
@@ -779,6 +814,7 @@ export default function SocialAccountsPage() {
           />
           <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', lineHeight: 1.7, marginBottom: 26 }}>
             最新 N 条帖子（1-10,000）。较大的同步会分页抓取，并在请求之间短暂间隔以降低限流风险。
+            {syncTarget?.platform === 'facebook' && '（Facebook 为 Google 索引快照模式，最多约 10 条，新帖存在索引滞后）'}
           </Text>
 
           {/* Progress */}
@@ -942,10 +978,25 @@ export default function SocialAccountsPage() {
             <Select options={platformOptions} placeholder="选择平台" />
           </Form.Item>
           <Form.Item name="account_name" label="账号名称" rules={[{ required: true }]}>
-            <Input placeholder="如: @elonmusk" />
+            <Input
+              placeholder={fbPlatform ? '如: 某公众人物昵称' : '如: @elonmusk'}
+              suffix={
+                fbPlatform ? (
+                  <Button
+                    type="link"
+                    size="small"
+                    loading={fbSearching}
+                    onClick={handleFbSearch}
+                    style={{ padding: 0, height: 'auto' }}
+                  >
+                    搜索候选账号
+                  </Button>
+                ) : null
+              }
+            />
           </Form.Item>
           <Form.Item name="account_url" label="账号 URL" rules={[{ required: true }]}>
-            <Input placeholder="如: https://x.com/elonmusk" />
+            <Input placeholder={fbPlatform ? '如: https://www.facebook.com/xxx （也可点上方按钮反查填充）' : '如: https://x.com/elonmusk'} />
           </Form.Item>
           <Form.Item name="avatar_url" label="头像 URL">
             <Input placeholder="可选" />
@@ -1037,6 +1088,58 @@ export default function SocialAccountsPage() {
         </Form>
       </Modal>
 
+      {/* Facebook 昵称反查候选选择 */}
+      <Modal
+        title="选择 Facebook 候选账号"
+        open={fbSearchOpen}
+        onCancel={() => setFbSearchOpen(false)}
+        footer={null}
+        width={560}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            fontSize: 13,
+            color: 'var(--text-secondary)',
+            background: 'rgba(24,119,242,0.12)',
+            border: '1px solid rgba(24,119,242,0.35)',
+          }}>
+            以下为 Google 搜索到的疑似主页，点击一条即可自动填充账号名称与 URL。
+          </div>
+          {fbCandidates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+              未找到匹配的 Facebook 主页
+            </div>
+          ) : (
+            fbCandidates.map((c, i) => (
+              <div
+                key={i}
+                onClick={() => handleFbPick(c)}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(24,119,242,0.25)',
+                  background: 'var(--surface-1)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#1877F2')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(24,119,242,0.25)')}
+              >
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#1877F2' }}>{c.nickname}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', wordBreak: 'break-all', marginTop: 2 }}>{c.url}</div>
+                {c.snippet ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {c.snippet}
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
       {/* Import modal */}
       <Modal
         title="批量导入社交账号"
@@ -1054,7 +1157,7 @@ export default function SocialAccountsPage() {
             description={
               <>
                 支持 xlsx / xls / csv 格式；列名必须为：<b>平台、账号名称、账号URL</b>。<br />
-                平台可选：x / youtube / xiaohongshu / douyin / weibo / toutiao / 108community（支持中文别名，如"微博"）。
+                平台可选：x / youtube / xiaohongshu / douyin / weibo / toutiao / 108community / facebook（支持中文别名，如"微博"）。
                 重复账号 URL 会自动跳过。
               </>
             }

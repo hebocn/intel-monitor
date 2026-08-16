@@ -94,9 +94,11 @@ async def sync_now(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """同步账号：按指定条数拉取 X/微博 正文存档（纯拉取，不 AI 摘要、不推送）。
+    """同步账号：按指定条数拉取 X/微博/Facebook 正文存档（纯拉取，不 AI 摘要、不推送）。
 
     结果写入 monitor_results（summary 为空），返回 result_id 供前端展示/导出。
+    Facebook 为 CSE 索引快照模式（headless Playwright，不依赖 OpenCLI 登录态），
+    最多返回约 10 条 Google 已索引的帖子。
     """
     if target_type != "social_media":
         raise HTTPException(status_code=400, detail="同步仅支持社交账号")
@@ -106,18 +108,26 @@ async def sync_now(
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
 
-    if target.platform not in ("x", "weibo"):
-        raise HTTPException(status_code=400, detail=f"同步暂不支持平台: {target.platform}（当前支持 x / weibo）")
+    if target.platform not in ("x", "weibo", "facebook"):
+        raise HTTPException(status_code=400, detail=f"同步暂不支持平台: {target.platform}（当前支持 x / weibo / facebook）")
 
-    if not _check_opencli():
-        raise HTTPException(status_code=503, detail="OpenCLI 未安装，请运行: npm install -g @jackwener/opencli")
+    if target.platform == "facebook":
+        # Facebook 同步：Google CSE + headless Playwright，无需 OpenCLI/登录态
+        from crawlers.facebook_crawler import FacebookCrawler
+        from crawlers.base import _run_crawler_in_thread
 
-    # 平台抓取上限：OpenCLI 微博 user-posts 最多 100 条，X tweets 最多 10000 条
-    platform_limit = min(limit, 100 if target.platform == "weibo" else 10000)
+        crawler = FacebookCrawler()
+        crawl_result = await _run_crawler_in_thread(crawler.crawl(target.account_url))
+    else:
+        if not _check_opencli():
+            raise HTTPException(status_code=503, detail="OpenCLI 未安装，请运行: npm install -g @jackwener/opencli")
 
-    crawl_result = await crawl_with_opencli(
-        target.platform, target.account_name, target.account_url, limit=platform_limit,
-    )
+        # 平台抓取上限：OpenCLI 微博 user-posts 最多 100 条，X tweets 最多 10000 条
+        platform_limit = min(limit, 100 if target.platform == "weibo" else 10000)
+
+        crawl_result = await crawl_with_opencli(
+            target.platform, target.account_name, target.account_url, limit=platform_limit,
+        )
 
     monitor_result = MonitorResult(
         target_id=target_id,

@@ -46,6 +46,12 @@ export const targetsAPI = {
   importBatch: (formData: FormData) => api.post('/targets/import', formData, { timeout: 120000 }),
 }
 
+// Facebook (账号反查候选)
+export const facebookAPI = {
+  searchAccounts: (nickname: string, limit = 8) =>
+    api.post('/facebook/search', { nickname, limit }, { timeout: 60000 }),
+}
+
 // Websites
 export const websitesAPI = {
   list: () => api.get('/websites'),
