@@ -738,3 +738,13 @@ button, a, .ant-menu-item, .ant-select-item, .ant-btn, .ant-table-row {
 .feishu-alert-info .ant-alert-message { color: var(--text-primary) !important; }
 .feishu-alert-info .ant-alert-description { color: var(--text-secondary) !important; }
 .feishu-alert-info .ant-alert-icon { color: #3370ff !important; }
+
+/* Import alerts — dark theme adaptation */
+.import-alert-info {
+  background: var(--surface-1) !important;
+  border: 1px solid rgba(51, 112, 255, 0.3) !important;
+  border-radius: 12px !important;
+}
+.import-alert-info .ant-alert-message { color: var(--text-primary) !important; }
+.import-alert-info .ant-alert-description { color: var(--text-secondary) !important; }
+.import-alert-info .ant-alert-icon { color: #3370ff !important; }

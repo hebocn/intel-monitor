@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, Form, Input, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton } from 'antd'
+import { Button, Modal, Form, Input, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, GlobalOutlined, CodeOutlined,
   CheckCircleOutlined, PauseCircleOutlined, LinkOutlined,
+  UploadOutlined, DownloadOutlined, FileExcelOutlined,
 } from '@ant-design/icons'
 import { websitesAPI, scheduleAPI, resultsAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
@@ -193,6 +194,9 @@ export default function WebsitesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [runningId, setRunningId] = useState<number | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
   const [form] = Form.useForm()
   const navigate = useNavigate()
 
@@ -207,6 +211,40 @@ export default function WebsitesPage() {
   }
 
   useEffect(() => { fetch() }, [])
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await websitesAPI.importTemplate()
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'website_import_template.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      message.error('模板下载失败')
+    }
+  }
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await websitesAPI.importBatch(formData)
+      setImportResult(res.data)
+      message.success(`导入完成：成功 ${res.data.created} 条`)
+      fetch()
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '导入失败')
+      setImportResult(null)
+    } finally {
+      setImporting(false)
+    }
+    return false // 阻止 Upload 默认上传
+  }
 
   const handleSubmit = async () => {
     const values = await form.validateFields()
@@ -284,15 +322,25 @@ export default function WebsitesPage() {
             WEBSITE TARGETS · {websites.length} 个目标
           </div>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true) }}
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.1s' }}
-        >
-          添加网站
-        </Button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            icon={<UploadOutlined />}
+            onClick={() => setImportOpen(true)}
+            className="animate-fade-in-up"
+            style={{ animationDelay: '0.08s' }}
+          >
+            批量导入
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true) }}
+            className="animate-fade-in-up"
+            style={{ animationDelay: '0.1s' }}
+          >
+            添加网站
+          </Button>
+        </div>
       </div>
 
       {/* Website cards */}
@@ -368,6 +416,67 @@ export default function WebsitesPage() {
             <Switch />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Import modal */}
+      <Modal
+        title="批量导入网站"
+        open={importOpen}
+        onCancel={() => { setImportOpen(false); setImportResult(null) }}
+        footer={null}
+        width={520}
+      >
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Alert
+            type="info"
+            showIcon
+            className="import-alert-info"
+            message="请先下载模板，按固定列名整理后上传"
+            description="支持 xlsx / xls / csv 格式；列名必须为：网站名称、网站URL。重复 URL 会自动跳过。"
+          />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate} style={{ flex: 1 }}>
+              下载导入模板
+            </Button>
+          </div>
+          <Upload.Dragger
+            accept=".xlsx,.xls,.csv"
+            showUploadList={false}
+            beforeUpload={handleImportFile}
+            disabled={importing}
+          >
+            <p className="ant-upload-drag-icon"><FileExcelOutlined /></p>
+            <p className="ant-upload-text">点击或拖拽文件到此处上传</p>
+            <p className="ant-upload-hint">{importing ? '正在导入...' : '上传后自动解析并批量创建'}</p>
+          </Upload.Dragger>
+
+          {importResult && (
+            <div style={{
+              background: 'var(--surface-1)', borderRadius: 12, padding: '14px 16px',
+              border: '1px solid var(--border)',
+            }}>
+              <Text strong>导入结果</Text>
+              <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                <Tag color="blue">共 {importResult.total} 行</Tag>
+                <Tag color="green">成功 {importResult.created}</Tag>
+                <Tag color="orange">重复跳过 {importResult.skipped_dup}</Tag>
+                <Tag color="red">失败 {importResult.failed}</Tag>
+              </div>
+              {importResult.errors?.length > 0 && (
+                <div style={{ marginTop: 10, maxHeight: 160, overflowY: 'auto', fontSize: 12, color: '#c75050' }}>
+                  {importResult.errors.map((e: string, i: number) => (
+                    <div key={i}>{e}</div>
+                  ))}
+                </div>
+              )}
+              {importResult.created_names?.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                  已导入: {importResult.created_names.join('、')}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   )
