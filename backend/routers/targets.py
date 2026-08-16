@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,6 +94,44 @@ async def create_target(
     background_tasks.add_task(_warm_and_verify, target.id)
 
     return target
+
+
+class TargetBatchUpdateRequest(BaseModel):
+    """批量修改：target_ids 必填；is_active / push_enabled 未提供则保持不变。"""
+    target_ids: list[int] = Field(..., min_length=1)
+    is_active: bool | None = None
+    push_enabled: bool | None = None
+
+
+@router.post("/batch-update")
+async def batch_update_targets(
+    req: TargetBatchUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量更新监测（is_active）与飞书推送（push_enabled）开关。"""
+    updates = {}
+    if req.is_active is not None:
+        updates["is_active"] = req.is_active
+    if req.push_enabled is not None:
+        updates["push_enabled"] = req.push_enabled
+    if not updates:
+        raise HTTPException(status_code=400, detail="至少需要提供 is_active 或 push_enabled")
+
+    result = await db.execute(
+        select(Target).where(
+            Target.id.in_(req.target_ids),
+            Target.user_id == user.id,
+        )
+    )
+    targets = result.scalars().all()
+    if not targets:
+        raise HTTPException(status_code=404, detail="未找到匹配的社交账号目标")
+    for t in targets:
+        for k, v in updates.items():
+            setattr(t, k, v)
+    await db.commit()
+    return {"updated": len(targets), "fields": list(updates.keys())}
 
 
 @router.put("/{target_id}", response_model=TargetResponse)

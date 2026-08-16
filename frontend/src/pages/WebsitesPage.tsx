@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, Form, Input, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert } from 'antd'
+import { Button, Modal, Form, Input, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert, Select } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, GlobalOutlined, CodeOutlined,
   CheckCircleOutlined, PauseCircleOutlined, LinkOutlined,
   UploadOutlined, DownloadOutlined, FileExcelOutlined,
+  SearchOutlined, SettingOutlined,
 } from '@ant-design/icons'
 import { websitesAPI, scheduleAPI, resultsAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
@@ -197,6 +198,11 @@ export default function WebsitesPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [batchActive, setBatchActive] = useState<'keep' | 'on' | 'off'>('keep')
+  const [batchPush, setBatchPush] = useState<'keep' | 'on' | 'off'>('keep')
+  const [batchSaving, setBatchSaving] = useState(false)
   const [form] = Form.useForm()
   const navigate = useNavigate()
 
@@ -313,6 +319,35 @@ export default function WebsitesPage() {
     setModalOpen(true)
   }
 
+  // 前端本地过滤：按网站名搜索
+  const filtered = searchQuery.trim()
+    ? websites.filter((w: any) => (w.name || '').toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : websites
+
+  const handleBatchUpdate = async () => {
+    if (filtered.length === 0) return
+    const payload: any = { website_ids: filtered.map((w: any) => w.id) }
+    if (batchActive !== 'keep') payload.is_active = batchActive === 'on'
+    if (batchPush !== 'keep') payload.push_enabled = batchPush === 'on'
+    if (payload.is_active === undefined && payload.push_enabled === undefined) {
+      message.warning('请至少选择一项要修改的开关')
+      return
+    }
+    setBatchSaving(true)
+    try {
+      const res = await websitesAPI.batchUpdate(payload)
+      message.success(`已批量更新 ${res.data.updated} 个网站`)
+      setBatchOpen(false)
+      setBatchActive('keep')
+      setBatchPush('keep')
+      fetch()
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '批量更新失败')
+    } finally {
+      setBatchSaving(false)
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
@@ -323,6 +358,15 @@ export default function WebsitesPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            icon={<SettingOutlined />}
+            onClick={() => setBatchOpen(true)}
+            disabled={websites.length === 0}
+            className="animate-fade-in-up"
+            style={{ animationDelay: '0.06s' }}
+          >
+            批量设置
+          </Button>
           <Button
             icon={<UploadOutlined />}
             onClick={() => setImportOpen(true)}
@@ -343,7 +387,24 @@ export default function WebsitesPage() {
         </div>
       </div>
 
+      {/* 搜索框：按网站名定位 */}
+      <div className="animate-fade-in-up" style={{ marginBottom: 16, animationDelay: '0.12s' }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
+          placeholder="搜索网站名称，定位到指定网站..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          style={{ maxWidth: 420, borderRadius: 10 }}
+        />
+      </div>
+
       {/* Website cards */}
+      {filtered.length === 0 && websites.length > 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
+          未找到匹配「{searchQuery}」的网站
+        </div>
+      ) : null}
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {Array.from({ length: 3 }).map((_, i) => (
@@ -367,7 +428,7 @@ export default function WebsitesPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {websites.map((site, idx) => (
+          {filtered.map((site, idx) => (
             <WebsiteCard
               key={site.id}
               site={site}
@@ -381,6 +442,49 @@ export default function WebsitesPage() {
           ))}
         </div>
       )}
+
+      {/* 批量设置弹窗：作用于当前筛选结果 */}
+      <Modal
+        title={`批量设置（${filtered.length} 个网站）`}
+        open={batchOpen}
+        onOk={handleBatchUpdate}
+        okText="应用"
+        confirmLoading={batchSaving}
+        onCancel={() => { setBatchOpen(false); setBatchActive('keep'); setBatchPush('keep') }}
+        width={460}
+      >
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            以下设置将作用于当前{searchQuery ? `筛选结果「${searchQuery}」` : '全部网站'}（共 {filtered.length} 个）
+          </Text>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>启用监测</Text>
+            <Select
+              value={batchActive}
+              onChange={setBatchActive}
+              style={{ width: 200 }}
+              options={[
+                { value: 'keep', label: '保持不变' },
+                { value: 'on', label: '开启' },
+                { value: 'off', label: '关闭' },
+              ]}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 14, fontWeight: 600 }}>飞书推送</Text>
+            <Select
+              value={batchPush}
+              onChange={setBatchPush}
+              style={{ width: 200 }}
+              options={[
+                { value: 'keep', label: '保持不变' },
+                { value: 'on', label: '开启' },
+                { value: 'off', label: '关闭' },
+              ]}
+            />
+          </div>
+        </div>
+      </Modal>
 
       {/* Add/Edit modal */}
       <Modal

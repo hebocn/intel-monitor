@@ -2,6 +2,7 @@
 import io
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from pydantic import BaseModel, Field
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,44 @@ async def create_website(
     await db.commit()
     await db.refresh(website)
     return website
+
+
+class WebsiteBatchUpdateRequest(BaseModel):
+    """批量修改：website_ids 必填；is_active / push_enabled 未提供则保持不变。"""
+    website_ids: list[int] = Field(..., min_length=1)
+    is_active: bool | None = None
+    push_enabled: bool | None = None
+
+
+@router.post("/batch-update")
+async def batch_update_websites(
+    req: WebsiteBatchUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量更新监测（is_active）与飞书推送（push_enabled）开关。"""
+    updates = {}
+    if req.is_active is not None:
+        updates["is_active"] = req.is_active
+    if req.push_enabled is not None:
+        updates["push_enabled"] = req.push_enabled
+    if not updates:
+        raise HTTPException(status_code=400, detail="至少需要提供 is_active 或 push_enabled")
+
+    result = await db.execute(
+        select(WebsiteTarget).where(
+            WebsiteTarget.id.in_(req.website_ids),
+            WebsiteTarget.user_id == user.id,
+        )
+    )
+    targets = result.scalars().all()
+    if not targets:
+        raise HTTPException(status_code=404, detail="未找到匹配的网站目标")
+    for t in targets:
+        for k, v in updates.items():
+            setattr(t, k, v)
+    await db.commit()
+    return {"updated": len(targets), "fields": list(updates.keys())}
 
 
 @router.put("/{website_id}", response_model=WebsiteResponse)
