@@ -11,15 +11,16 @@
 - **跨平台舆情搜索** — 覆盖微博/抖音/小红书/头条/108社区/X/YouTube/Facebook/Telegram 九个平台
 - **十六平台热搜追踪** — 一键批量抓取微博/知乎/B站/百度/抖音/头条/小红书/HackerNews/GitHub 等平台热搜
 - **飞书移动端推送** — lark-oapi 长连接，监测完成自动推送到手机，支持 /绑定 /列表 /结果 /监测 等对话指令与卡片按钮
-- **社交账号同步存档** — x/微博账号一键按条数（1-10000）拉取正文存档，抽屉展示并可导出 Markdown / NDJSON
+- **社交账号同步存档** — x/微博/Facebook 账号一键按条数拉取正文存档，抽屉展示并可导出 Markdown / NDJSON
+- **Facebook 账号监测** — Google CSE 索引快照 + headless Playwright，无需登录态；昵称一键反查候选主页，监测与同步共用同一通道
 
 ## 功能矩阵
 
-![功能矩阵](design-demos/feature-matrix.png)
+![功能矩阵](design-demos/功能图.png)
 
 ## 架构速览
 
-![系统架构图](design-demos/architecture.png)
+![系统架构图](design-demos/架构图.png)
 
 ## 快速启动
 
@@ -99,7 +100,7 @@ AI 摘要提示词可通过 Web 界面或 `/api/settings/prompts` 在线编辑�
 | `FIRECRAWL_API_KEY` | 情报报告 Web 搜索 |
 | `TAVILY_API_KEY` | 情报报告辅助搜索 |
 | `YOUTUBE_API_KEY` | YouTube 内容搜索 |
-| `GOOGLE_CSE_ID` + `GOOGLE_API_KEY` | Facebook 内容搜索（Google CSE） |
+| `GOOGLE_CSE_ID` + `GOOGLE_API_KEY` | Facebook 内容搜索（Google CSE）：账号监测 / 同步 / 昵称反查候选 |
 
 ## CDP 自动修复
 
@@ -123,11 +124,13 @@ Scrapling (轻量 HTTP 客户端)
   │  优势: 无需浏览器，速度快
   ↓ 不可用/失败
 Playwright (全功能无头浏览器)
-  │  支持: 全部 8 个平台
+  │  支持: 全部 9 个平台（Facebook 走 Google CSE 索引快照，无需登录态）
   │  条件: playwright 已安装
   ↓ 不可用/失败
 ❌ 标记失败
 ```
+
+> 💡 **Facebook 采集通道**：Facebook 账号监测/同步不依赖 OpenCLI 或 Chrome 登录态，由 `facebook_crawler.py` 用 Google CSE 搜索该账号被索引的帖子，再逐条进详情页提取（登录墙帖自动降级为 CSE 摘要）。新帖存在 Google 索引滞后（天~周级），且只能拿到已公开索引的内容。
 
 ### 平台覆盖矩阵
 
@@ -141,13 +144,14 @@ Playwright (全功能无头浏览器)
 | Bilibili | ✅ | | | ✅ |
 | 今日头条 | | | ✅ | ✅ |
 | 108天台社区 | | | | ✅ |
+| Facebook | | | | ✅（CSE） |
 
 ## 账号同步存档
 
-对 x / 微博账号一键拉取正文存档（**纯拉取**：不生成 AI 摘要、不推送飞书），随时查看并导出：
+对 x / 微博 / Facebook 账号一键拉取正文存档（**纯拉取**：不生成 AI 摘要、不推送飞书），随时查看并导出：
 
 1. **触发** — 社交账号目标卡片点击 🔄 同步按钮，选择抓取条数（1-10000，快捷档 200 / 1.0k / 5.0k / 全部）
-2. **抓取** — 经 OpenCLI 复用 Chrome 登录态拉取账号最新帖子（x ≤ 10000 条、微博 ≤ 100 条，大条数自动分页节流）
+2. **抓取** — x/微博 经 OpenCLI 复用 Chrome 登录态拉取账号最新帖子（x ≤ 10000 条、微博 ≤ 100 条，大条数自动分页节流）；**Facebook 走 Google CSE 索引快照（约 10 条，不依赖登录态）**
 3. **存档** — 结果写入 `MonitorResult.raw_content`，同一账号多次同步保留多条历史记录
 4. **展示** — 右侧抽屉按「最近帖子」卡片展示（时间 + ID + 正文 + 互动数据 + 原帖链接）
 5. **导出** — 支持导出为 **Markdown**（含平台/账号/时间/正文/图片链接）或 **NDJSON**（每行一条完整 JSON）
@@ -215,7 +219,7 @@ Playwright (全功能无头浏览器)
 | **前端** | React 18, Ant Design 5, Vite, TypeScript |
 | **情报地图** | intel-map（独立 Vite 应用）, Leaflet |
 | **AI 摘要** | MiniMax / DeepSeek / MiMo（可切换，支持多模态） |
-| **爬虫引擎** | OpenCLI, Chrome CDP, Scrapling, Playwright |
+| **爬虫引擎** | OpenCLI, Chrome CDP, Scrapling, Playwright, Google CSE |
 | **Web 搜索** | Firecrawl, Tavily |
 | **飞书集成** | lark-oapi（WebSocket 长连接，消息卡片） |
 | **语音转写** | yt-dlp + faster-whisper (YouTube 深度分析) |
@@ -236,8 +240,10 @@ intel-monitor/
 │   │   ├── opencli_crawler.py
 │   │   ├── cdp_crawler.py
 │   │   ├── douyin_scrapling_crawler.py
+│   │   ├── facebook_crawler.py   # Facebook 监测（Google CSE + headless）
+│   │   ├── facebook_cse_search.py # Facebook 舆情搜索（CSE + 详情解析）
 │   │   └── ...              # 各平台 Playwright 爬虫
-│   ├── routers/             # REST API（14 个路由模块）
+│   ├── routers/             # REST API（15 个路由模块）
 │   │   ├── auth.py          # 认证
 │   │   ├── targets.py       # 监控目标 CRUD
 │   │   ├── results.py       # 抓取结果
@@ -246,6 +252,7 @@ intel-monitor/
 │   │   ├── intelligence.py  # 智能报告
 │   │   ├── hot_topics.py    # 热搜追踪
 │   │   ├── account_match.py # 跨平台账号匹配
+│   │   ├── facebook.py      # Facebook 昵称反查候选
 │   │   ├── feishu.py        # 飞书状态/配置/绑定
 │   │   └── ...
 │   ├── services/            # 业务逻辑
@@ -300,6 +307,9 @@ A: 依次检查：① 目标编辑表单的「飞书推送」开关是否开启�
 
 **Q: 账号同步超时？**
 A: 同步请求单独设置了 600 秒超时（选"全部"10000 条时约需 2-5 分钟）；确认 Chrome 已登录目标平台，OpenCLI 可用。
+
+**Q: Facebook 监测/同步不到新帖？**
+A: Facebook 走 Google CSE 索引快照，只能拿到 Google 已公开索引的内容，新帖存在天~周级的索引滞后；隐私设置高的账号可能没有索引结果。这是 CSE 方案的固有限制，不依赖登录态换取的是稳定免配置。
 
 ## 文档
 
