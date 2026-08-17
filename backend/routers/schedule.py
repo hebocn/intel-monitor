@@ -97,8 +97,8 @@ async def sync_now(
     """同步账号：按指定条数拉取 X/微博/Facebook 正文存档（纯拉取，不 AI 摘要、不推送）。
 
     结果写入 monitor_results（summary 为空），返回 result_id 供前端展示/导出。
-    Facebook 为 CSE 索引快照模式（headless Playwright，不依赖 OpenCLI 登录态），
-    最多返回约 10 条 Google 已索引的帖子。
+    Facebook 优先走 CDP 真实浏览器模拟人浏览（需 Chrome 登录 FB、CDP Proxy 运行），
+    不可用时降级为 CSE 索引快照模式（约 10 条 Google 已索引的帖子）。
     """
     if target_type != "social_media":
         raise HTTPException(status_code=400, detail="同步仅支持社交账号")
@@ -111,13 +111,22 @@ async def sync_now(
     if target.platform not in ("x", "weibo", "facebook"):
         raise HTTPException(status_code=400, detail=f"同步暂不支持平台: {target.platform}（当前支持 x / weibo / facebook）")
 
+    method = "opencli"
     if target.platform == "facebook":
-        # Facebook 同步：Google CSE + headless Playwright，无需 OpenCLI/登录态
-        from crawlers.facebook_crawler import FacebookCrawler
-        from crawlers.base import _run_crawler_in_thread
+        # Facebook 同步：优先 CDP 真实浏览器模拟人浏览（需 Chrome 登录 FB），
+        # 降级 Google CSE 快照模式（headless Playwright）
+        from services.monitor import crawl_with_fallback as _fb_fallback
+        from crawlers.base import CrawlResult as _CrawlResult
 
-        crawler = FacebookCrawler()
-        crawl_result = await _run_crawler_in_thread(crawler.crawl(target.account_url))
+        crawl_result, method, _err = await _fb_fallback(
+            target.platform, target.account_name, target.account_url,
+            post_limit=min(limit, 100),
+        )
+        if crawl_result is None:
+            crawl_result = _CrawlResult(
+                success=False,
+                error_message="所有爬取方式均失败: " + ("; ".join(_err) or "未知错误"),
+            )
     else:
         if not _check_opencli():
             raise HTTPException(status_code=503, detail="OpenCLI 未安装，请运行: npm install -g @jackwener/opencli")
@@ -137,7 +146,7 @@ async def sync_now(
     if crawl_result.success:
         import json as _json
         monitor_result.status = "success"
-        monitor_result.crawl_method = "opencli"
+        monitor_result.crawl_method = method or "opencli"
         monitor_result.raw_content = _json.dumps(
             [{
                 "title": p.title,

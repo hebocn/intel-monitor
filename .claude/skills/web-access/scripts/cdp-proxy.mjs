@@ -559,6 +559,45 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ value: resp.result?.result?.value }));
     }
 
+    // GET /focus?target=xxx - 激活标签页（Page.bringToFront，后台 tab 无法接收输入事件）
+    else if (pathname === '/focus') {
+      const sid = await ensureSession(q.target);
+      const resp = await sendCDP('Page.bringToFront', {}, sid);
+      res.end(JSON.stringify({ ok: true }));
+    }
+
+    // GET /key?target=xxx&key=Escape - 发送键盘事件（关闭弹层/对话框）
+    else if (pathname === '/key') {
+      const sid = await ensureSession(q.target);
+      const key = q.key || 'Escape';
+      const codeMap = {
+        Escape: 'Escape', Enter: 'Enter', Tab: 'Tab', ArrowDown: 'ArrowDown',
+        ArrowUp: 'ArrowUp', End: 'End', Home: 'Home', PageDown: 'PageDown', PageUp: 'PageUp',
+      };
+      const code = codeMap[key] || key;
+      await sendCDP('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0, nativeVirtualKeyCode: 0 }, sid);
+      await sendCDP('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0, nativeVirtualKeyCode: 0 }, sid);
+      await new Promise(r => setTimeout(r, 300));
+      res.end(JSON.stringify({ ok: true, key }));
+    }
+
+    // GET /wheel?target=xxx&deltaY=600&times=3 - 发送真实滚轮事件（可信输入，触发 Facebook 等站点的懒加载）
+    else if (pathname === '/wheel') {
+      const sid = await ensureSession(q.target);
+      const deltaY = parseInt(q.deltaY || '600');
+      const deltaX = parseInt(q.deltaX || '0');
+      const times = Math.min(parseInt(q.times || '1'), 30);
+      const x = parseInt(q.x || '800');
+      const y = parseInt(q.y || '500');
+      for (let i = 0; i < times; i++) {
+        await sendCDP('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX, deltaY }, sid);
+        await new Promise(r => setTimeout(r, 250));
+      }
+      // 等待懒加载触发
+      await new Promise(r => setTimeout(r, 800));
+      res.end(JSON.stringify({ ok: true, times, deltaY, deltaX, x, y }));
+    }
+
     // GET /screenshot?target=xxx&file=/tmp/x.png - 截图
     else if (pathname === '/screenshot') {
       const sid = await ensureSession(q.target);
@@ -601,6 +640,9 @@ const server = http.createServer(async (req, res) => {
           '/eval?target=': 'POST body=JS表达式 - 执行 JS',
           '/click?target=': 'POST body=CSS选择器 - 点击元素',
           '/scroll?target=&y=&direction=': 'GET - 滚动页面',
+          '/wheel?target=&deltaY=&times=': 'GET - 真实滚轮事件（可信输入，触发懒加载）',
+          '/focus?target=': 'GET - 激活标签页（后台 tab 需先激活才能接收输入）',
+          '/key?target=&key=Escape': 'GET - 发送键盘事件（关闭弹层）',
           '/screenshot?target=&file=': 'GET - 截图',
         },
       }));
