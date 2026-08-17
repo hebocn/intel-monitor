@@ -458,10 +458,12 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
             )
 
         # 边滚边提取，按链接去重。
-        # FB 懒加载较慢：每轮滚 3×600px 后等待渲染，连续 4 轮无新增才停止。
+        # FB 懒加载较慢：每轮滚 3×600px 后等待渲染；
+        # 轮数上限随目标条数扩展（每条帖子约需滚动 600-900px），
+        # 连续 6 轮（约 30 秒）无新帖才判定到底；滚轮瞬时失败不硬停。
         seen: dict[str, dict] = {}
         no_new_rounds = 0
-        max_rounds = 20
+        max_rounds = max(25, post_limit * 3)
         for _ in range(max_rounds):
             # 展开折叠的长文（"展开 / 查看更多 / See more"）
             try:
@@ -470,39 +472,43 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
             except Exception:
                 pass
 
-            if not await _cdp_wheel(target_id, delta_y=600, times=3):
-                break
+            wheel_ok = await _cdp_wheel(target_id, delta_y=600, times=3)
             await _cdp_wait(target_id, 4)
 
-            raw = await _cdp_eval(target_id, FB_EXTRACT_POSTS_JS)
-            data: list[dict] = []
-            parsed = False
-            try:
-                start, end = raw.find("["), raw.rfind("]") + 1
-                if start >= 0 and end > start:
-                    data = json.loads(raw[start:end])
-                    parsed = True
-            except json.JSONDecodeError:
-                pass
-
-            new_count = 0
-            if parsed:
-                for item in data:
-                    content = (item.get("content") or "").strip()
-                    images = item.get("images") or []
-                    if not content and not images:
-                        continue  # 空内容且无图（评论链接等噪音）跳过
-                    key = item.get("url") or content[:60]
-                    if key and key not in seen:
-                        seen[key] = item
-                        new_count += 1
-
-            if new_count == 0:
+            if not wheel_ok:
+                # 滚轮失败（代理瞬时故障）：计入无新增轮次，继续尝试
                 no_new_rounds += 1
             else:
-                no_new_rounds = 0
-            # 连续 4 轮（约 20 秒）无新帖加载，或数量达标，停止滚动
-            if no_new_rounds >= 4:
+                raw = await _cdp_eval(target_id, FB_EXTRACT_POSTS_JS)
+                data: list[dict] = []
+                parsed = False
+                try:
+                    start, end = raw.find("["), raw.rfind("]") + 1
+                    if start >= 0 and end > start:
+                        data = json.loads(raw[start:end])
+                        parsed = True
+                except json.JSONDecodeError:
+                    pass
+
+                new_count = 0
+                if parsed:
+                    for item in data:
+                        content = (item.get("content") or "").strip()
+                        images = item.get("images") or []
+                        if not content and not images:
+                            continue  # 空内容且无图（评论链接等噪音）跳过
+                        key = item.get("url") or content[:60]
+                        if key and key not in seen:
+                            seen[key] = item
+                            new_count += 1
+
+                if new_count == 0:
+                    no_new_rounds += 1
+                else:
+                    no_new_rounds = 0
+
+            # 连续 6 轮（约 30 秒）无新帖加载，或数量达标，停止滚动
+            if no_new_rounds >= 6:
                 break
             if len(seen) >= max(post_limit * 3, 30):
                 break
