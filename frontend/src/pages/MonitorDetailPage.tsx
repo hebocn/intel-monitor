@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Tag, Typography, Empty, Select, Popconfirm, message, Image, Tooltip, Skeleton, Button } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   DeleteOutlined, FilterOutlined, RobotOutlined, FileTextOutlined,
-  HeartOutlined, CommentOutlined, LoadingOutlined, DownloadOutlined,
+  HeartOutlined, CommentOutlined, LoadingOutlined, DownloadOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { resultsAPI } from '../services/api'
 
@@ -277,6 +277,7 @@ function CommentCard({ comment, rank, compact = false }: { comment: any; rank: n
 }
 
 export default function MonitorDetailPage() {
+  const navigate = useNavigate()
   const { type, id } = useParams<{ type: string; id: string }>()
   const [results, setResults] = useState<any[]>([])
   const [selectedResult, setSelectedResult] = useState<any>(null)
@@ -390,7 +391,16 @@ export default function MonitorDetailPage() {
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
-        <h1 className="page-title animate-fade-in-up">监测详情</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(type === 'social_media' ? '/social' : '/websites')}
+            style={{ display: 'inline-flex', alignItems: 'center' }}
+          >
+            返回
+          </Button>
+          <h1 className="page-title animate-fade-in-up" style={{ margin: 0 }}>监测详情</h1>
+        </div>
         <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
           {type === 'social_media' ? 'SOCIAL' : 'WEBSITE'} · TARGET #{id}
         </div>
