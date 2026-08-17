@@ -87,7 +87,7 @@ OpenCLI → CDP → Playwright，通过 `crawlers/router.py:CrawlerRouter` 统�
 
 各爬虫入口通过 `build_*_entry()` 注册，自声明支持的平台：
 - **OpenCLI**: `opencli_crawler.py:build_opencli_entry()` — x, xiaohongshu, reddit, bilibili
-- **CDP**: `cdp_crawler.py:build_cdp_entry()` — x only
+- **CDP**: `cdp_crawler.py:build_cdp_entry()` — x, facebook（facebook 为"模拟人浏览"模式：真实 Chrome 登录态 + CDP 滚轮懒加载，需 CDP Proxy 运行且 Chrome 已登录 FB，否则降级 Playwright CSE 快照）
 - **Playwright**: `__init__.py:_build_playwright_entry()` — x, youtube, xiaohongshu, douyin, weibo
 - **Claude**: `claude_crawler.py:build_claude_entry()` — 全平台（默认未注册）
 

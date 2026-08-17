@@ -814,7 +814,7 @@ export default function SocialAccountsPage() {
           />
           <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', lineHeight: 1.7, marginBottom: 26 }}>
             最新 N 条帖子（1-10,000）。较大的同步会分页抓取，并在请求之间短暂间隔以降低限流风险。
-            {syncTarget?.platform === 'facebook' && '（Facebook 为 Google 索引快照模式，最多约 10 条，新帖存在索引滞后）'}
+            {syncTarget?.platform === 'facebook' && '（Facebook 优先用 Chrome 登录态模拟人浏览抓取最新帖；Chrome 未登录 FB 或 CDP 代理不可用时降级为 Google 索引快照模式，约 10 条）'}
           </Text>
 
           {/* Progress */}
