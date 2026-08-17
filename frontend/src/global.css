@@ -748,3 +748,26 @@ button, a, .ant-menu-item, .ant-select-item, .ant-btn, .ant-table-row {
 .import-alert-info .ant-alert-message { color: var(--text-primary) !important; }
 .import-alert-info .ant-alert-description { color: var(--text-secondary) !important; }
 .import-alert-info .ant-alert-icon { color: #3370ff !important; }
+
+/* Markdown rendering — AI 分析摘要 */
+.markdown-body h1 { font-size: 20px; font-weight: 700; margin: 16px 0 10px; color: var(--text-primary); line-height: 1.4; }
+.markdown-body h2 { font-size: 17px; font-weight: 700; margin: 18px 0 8px; color: var(--text-primary); padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.markdown-body h3 { font-size: 15px; font-weight: 700; margin: 14px 0 6px; color: var(--text-primary); }
+.markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 14px; font-weight: 700; margin: 12px 0 4px; color: var(--text-secondary); }
+.markdown-body p { margin: 6px 0; }
+.markdown-body strong { color: #fbbf24; font-weight: 700; }
+.markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 22px; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body li::marker { color: var(--accent); }
+.markdown-body table { border-collapse: collapse; margin: 12px 0; width: 100%; font-size: 13px; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--border-strong); padding: 7px 10px; text-align: left; }
+.markdown-body th { background: var(--surface-2); color: var(--text-primary); font-weight: 700; white-space: nowrap; }
+.markdown-body td { color: var(--text-secondary); }
+.markdown-body tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.markdown-body blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid var(--accent); background: var(--accent-light); border-radius: 0 8px 8px 0; color: var(--text-secondary); }
+.markdown-body code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 12.5px; color: #7dd3fc; }
+.markdown-body pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 10px 0; }
+.markdown-body pre code { background: none; border: none; padding: 0; }
+.markdown-body hr { border: none; border-top: 1px solid var(--border-strong); margin: 16px 0; }
+.markdown-body a { color: #60a5fa; }
+.markdown-body img { max-width: 100%; border-radius: 8px; }
