@@ -199,7 +199,7 @@ export default function AccountMatchPage() {
   const [matchMode, setMatchMode] = useState<string>('nickname')
   const [targetName, setTargetName] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
-  const [anchorPlatform, setAnchorPlatform] = useState<string>('weibo')
+  const [anchorPlatform, setAnchorPlatform] = useState<string>('auto')
   const [searching, setSearching] = useState(false)
   const [tasks, setTasks] = useState<MatchTask[]>([])
   const [selectedTask, setSelectedTask] = useState<MatchTask | null>(null)
@@ -241,6 +241,16 @@ export default function AccountMatchPage() {
     } catch { message.error('加载失败') }
   }
 
+  // 根据输入内容推断锚点平台：URL 看域名，纯数字=微博 UID，@或英文= X handle，中文=微博昵称
+  const inferAnchorPlatform = (input: string): string => {
+    const t = input.trim().toLowerCase()
+    if (t.includes('x.com/') || t.includes('twitter.com/')) return 'x'
+    if (t.includes('weibo.com')) return 'weibo'
+    if (/^\d+$/.test(t)) return 'weibo'
+    if (t.startsWith('@')) return 'x'
+    return /[\u4e00-\u9fa5]/.test(t) ? 'weibo' : 'x'
+  }
+
   const handleSearch = async () => {
     if (!targetName.trim()) { message.warning('请输入目标账号名/UID/URL'); return }
     if (!selectedPlatforms.length) { message.warning('至少选一个平台'); return }
@@ -250,7 +260,9 @@ export default function AccountMatchPage() {
         target_name: targetName.trim(),
         platforms: selectedPlatforms,
         match_mode: matchMode,
-        anchor_platform: matchMode === 'profile' ? anchorPlatform : undefined,
+        anchor_platform: matchMode === 'profile'
+          ? (anchorPlatform === 'auto' ? inferAnchorPlatform(targetName) : anchorPlatform)
+          : undefined,
       })
       message.success(res.data.message)
       fetchTasks()
@@ -317,6 +329,7 @@ export default function AccountMatchPage() {
               <Select value={anchorPlatform} onChange={setAnchorPlatform} size="large"
                 style={{ width: '100%', borderRadius: 10 }}
                 options={[
+                  { value: 'auto', label: '🤖 自动识别' },
                   { value: 'weibo', label: '📱 微博' },
                   { value: 'x', label: '🐦 X (Twitter)' },
                 ]} />

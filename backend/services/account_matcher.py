@@ -86,10 +86,15 @@ async def _run_scenario_profile(task, target_name, platforms, error_log, db, anc
     task.status = "fetching_anchor"
     await db.commit()
 
-    # Step 1: Resolve anchor user — use anchor_platform if provided, otherwise try all
+    # Step 1: Resolve anchor user — try anchor_platform first, then fall back to the
+    # remaining platforms so a wrong platform choice doesn't hard-fail the task.
     anchor = None
-    search_platforms = [anchor_platform] if anchor_platform else platforms
-    for platform in search_platforms:
+    anchor_platforms = ([anchor_platform] if anchor_platform else []) + [
+        p for p in (platforms or []) if p != anchor_platform
+    ]
+    if not anchor_platforms:
+        anchor_platforms = ["weibo", "x"]
+    for platform in anchor_platforms:
         task.status = f"fetching_anchor:{platform}"
         await db.commit()
         try:
@@ -97,11 +102,18 @@ async def _run_scenario_profile(task, target_name, platforms, error_log, db, anc
                 anchor = await get_weibo_user_by_uid_or_url(target_name)
             elif platform == "x":
                 anchor = await get_x_user_by_handle_or_url(target_name)
+            else:
+                error_log[f"anchor_{platform}"] = f"Unsupported anchor platform: {platform}"
+                continue
         except Exception as e:
             error_log[f"anchor_{platform}"] = str(e)
             logger.warning(f"Anchor fetch error [{platform}]: {e}")
         if anchor:
             break
+        error_log[f"anchor_{platform}"] = (
+            f"could not resolve user from input {target_name!r} "
+            f"(no exception, resolver returned None)"
+        )
 
     if not anchor:
         task.status = "failed"
