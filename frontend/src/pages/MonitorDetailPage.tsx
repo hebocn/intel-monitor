@@ -7,6 +7,8 @@ import {
   HeartOutlined, CommentOutlined, LoadingOutlined, DownloadOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { resultsAPI } from '../services/api'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const { Text } = Typography
 
@@ -742,13 +744,18 @@ export default function MonitorDetailPage() {
                     AI 分析
                   </Text>
                 </div>
-                <div style={{
-                  color: 'var(--text-primary)',
-                  fontSize: 14,
-                  lineHeight: '26px',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  {selectedResult.summary}
+                <div
+                  className="markdown-body"
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize: 14,
+                    lineHeight: '26px',
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {selectedResult.summary}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
