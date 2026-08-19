@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from schemas.tag import TagBrief
+
 
 class TargetCreate(BaseModel):
     platform: str = Field(..., pattern="^(x|youtube|xiaohongshu|douyin|weibo|toutiao|108community|facebook)$")
@@ -54,5 +56,6 @@ class TargetResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    tags: list[TagBrief] = []
 
     model_config = {"from_attributes": True}

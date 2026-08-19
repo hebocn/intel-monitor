@@ -16,8 +16,8 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from database import init_db, engine
-from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu, facebook, platform_prefs, account_prefs
+from database import init_db, engine, async_session
+from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu, facebook, platform_prefs, account_prefs, tags
 from services.scheduler import setup_scheduler, refresh_jobs
 from services.feishu import start_feishu_client, stop_feishu_client
 
@@ -203,10 +203,32 @@ async def _ensure_schema():
                     logger.warning(f"Migration {migration_id} failed: {e}")
 
 
+async def _seed_initial_preset_tags():
+    """标签功能首次上线时（tags 表为空）为所有存量用户预置初始标签。"""
+    from sqlalchemy import select, func
+    from models.user import User
+    from models.tag import Tag
+    from services.preset_tags import PRESET_TAGS
+
+    async with async_session() as db:
+        tag_count = (await db.execute(select(func.count()).select_from(Tag))).scalar() or 0
+        if tag_count > 0:
+            return
+        user_ids = (await db.execute(select(User.id))).scalars().all()
+        if not user_ids:
+            return
+        for uid in user_ids:
+            for name, color in PRESET_TAGS:
+                db.add(Tag(user_id=uid, name=name, color=color, is_preset=True))
+        await db.commit()
+        logging.getLogger("preset_tags").info(f"已为 {len(user_ids)} 个存量用户预置初始标签")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await _ensure_schema()
+    await _seed_initial_preset_tags()
     setup_scheduler()
     await refresh_jobs()
     start_feishu_client()
@@ -234,6 +256,7 @@ app.include_router(feishu.router)
 app.include_router(facebook.router)
 app.include_router(platform_prefs.router)
 app.include_router(account_prefs.router)
+app.include_router(tags.router)
 
 # Serve frontend static files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
