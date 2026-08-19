@@ -46,6 +46,13 @@ export const targetsAPI = {
   importBatch: (formData: FormData) => api.post('/targets/import', formData, { timeout: 120000 }),
 }
 
+// Platform prefs (社交账号平台分区排序)
+export const platformPrefsAPI = {
+  list: () => api.get('/platform-prefs'),
+  save: (items: { platform: string; sort_order: number }[]) => api.put('/platform-prefs', { items }),
+  reset: () => api.delete('/platform-prefs'),
+}
+
 // Facebook (账号反查候选)
 export const facebookAPI = {
   searchAccounts: (nickname: string, limit = 8) =>

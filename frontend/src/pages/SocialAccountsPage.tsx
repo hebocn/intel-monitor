@@ -6,8 +6,9 @@ import {
   CheckCircleOutlined, SettingOutlined, SyncOutlined, DownloadOutlined, LoadingOutlined,
   SearchOutlined,
   UploadOutlined, FileExcelOutlined,
+  HolderOutlined, PushpinOutlined, DownOutlined, RightOutlined, CloseCircleOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI } from '../services/api'
+import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI, platformPrefsAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { formatBeijingTime, formatBeijingDate } from '../utils/time'
@@ -51,6 +52,8 @@ function AccountCard({
   onEdit,
   onDelete,
   onDetail,
+  onToggleActive,
+  togglingActive,
   idx,
 }: {
   target: any
@@ -61,6 +64,8 @@ function AccountCard({
   onEdit: () => void
   onDelete: () => void
   onDetail: () => void
+  onToggleActive: (checked: boolean) => void
+  togglingActive: boolean
   idx: number
 }) {
   const plat = platformMap[target.platform] || { label: target.platform, color: '#666' }
@@ -72,12 +77,14 @@ function AccountCard({
 
   return (
     <div
+      data-account-id={target.id}
       className={`animate-fade-in-up delay-${Math.min(idx + 1, 6)}`}
       style={{
         background: 'var(--surface-0, #fff)',
         borderRadius: 16,
         border: '1px solid var(--border)',
         overflow: 'hidden',
+        opacity: target.is_active ? 1 : 0.6,
         transition: 'all 0.2s ease',
         position: 'relative',
       }}
@@ -141,16 +148,18 @@ function AccountCard({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Status pill */}
+          {/* 一键启停 */}
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '3px 12px', borderRadius: 12,
             background: target.is_active ? 'rgba(34,197,94,0.08)' : 'rgba(140,140,140,0.08)',
             color: target.is_active ? '#22C55E' : '#8c8c8c',
             fontSize: 12, fontWeight: 600,
           }}>
-            {target.is_active ? <CheckCircleOutlined /> : <PauseCircleOutlined />}
-            {target.is_active ? '启用' : '停用'}
+            <Switch size="small" checked={target.is_active} loading={togglingActive} onChange={onToggleActive} />
+            <span style={{ minWidth: 26, textAlign: 'center' }}>
+              {target.is_active ? <CheckCircleOutlined /> : <PauseCircleOutlined />} {target.is_active ? '启用' : '停用'}
+            </span>
           </div>
 
           {/* Actions */}
@@ -292,6 +301,22 @@ export default function SocialAccountsPage() {
   const [fbCandidates, setFbCandidates] = useState<{ nickname: string; url: string; snippet?: string }[]>([])
   const [fbSearchOpen, setFbSearchOpen] = useState(false)
   const fbPlatform = Form.useWatch('platform', form) === 'facebook'
+  // 平台分区：自定义排序 / 折叠 / 拖拽
+  const [platformOrder, setPlatformOrder] = useState<string[] | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('soc_section_collapsed') || '{}') } catch { return {} }
+  })
+  const [dragPlatform, setDragPlatform] = useState<string | null>(null)
+  const [dragOverPlatform, setDragOverPlatform] = useState<string | null>(null)
+  const [orderSaving, setOrderSaving] = useState(false)
+  // 单卡启停切换中
+  const [togglingIds, setTogglingIds] = useState<number[]>([])
+  // 整平台批量立即执行
+  const [batchRunPlatform, setBatchRunPlatform] = useState<string | null>(null)
+  const [batchRunStatuses, setBatchRunStatuses] = useState<Record<number, 'pending' | 'running' | 'success' | 'failed' | 'skipped'>>({})
+  const [batchRunErrors, setBatchRunErrors] = useState<Record<number, string>>({})
+  const [batchRunDrawerOpen, setBatchRunDrawerOpen] = useState(false)
+  const [batchRunRange, setBatchRunRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
 
   const handleFbSearch = async () => {
     const nickname = form.getFieldValue('account_name')
@@ -333,6 +358,15 @@ export default function SocialAccountsPage() {
   }
 
   useEffect(() => { fetchTargets() }, [])
+
+  // 加载平台分区自定义排序（无则默认：账号数量降序）
+  useEffect(() => {
+    platformPrefsAPI.list().then(res => {
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setPlatformOrder(res.data.map((i: any) => i.platform))
+      }
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (syncingId == null) return
@@ -556,13 +590,23 @@ export default function SocialAccountsPage() {
   // 点击「立即执行」：先弹出时间范围选择，确认后按窗口执行
   const openRunModal = (target: any) => {
     setRunTarget(target)
+    setBatchRunPlatform(null)
+    setRunPreset('近24小时')
+    setRunRange([dayjs().subtract(24, 'hour'), dayjs()])
+    setRunModalOpen(true)
+  }
+
+  // 整平台「全部立即执行」：同一时间范围弹窗，逐个账号执行
+  const openBatchRunModal = (platform: string) => {
+    setBatchRunPlatform(platform)
+    setRunTarget(null)
     setRunPreset('近24小时')
     setRunRange([dayjs().subtract(24, 'hour'), dayjs()])
     setRunModalOpen(true)
   }
 
   const confirmRun = async () => {
-    if (!runTarget) return
+    if (!runTarget && !batchRunPlatform) return
     if (!runRange || !runRange[0] || !runRange[1]) {
       message.warning('请选择时间范围')
       return
@@ -572,6 +616,20 @@ export default function SocialAccountsPage() {
       message.warning('结束时间不能早于开始时间')
       return
     }
+
+    // 批量模式：对平台内启用账号逐个执行（限并发3）
+    if (batchRunPlatform) {
+      const accounts = (grouped[batchRunPlatform] || []).filter((t: any) => t.is_active)
+      if (accounts.length === 0) {
+        message.warning('该平台没有启用中的账号')
+        return
+      }
+      setRunModalOpen(false)
+      setBatchRunRange([start, end])
+      startBatchRun(accounts, start, end)
+      return
+    }
+
     const id = runTarget.id
     setRunModalOpen(false)
     setRunningId(id)
@@ -609,6 +667,72 @@ export default function SocialAccountsPage() {
     }
   }
 
+  // 批量执行：并发3个worker，逐个触发+轮询结果
+  const startBatchRun = async (accounts: any[], start: dayjs.Dayjs, end: dayjs.Dayjs, merge = false) => {
+    const statuses: Record<number, 'pending' | 'running' | 'success' | 'failed' | 'skipped'> = {}
+    accounts.forEach((t: any) => { statuses[t.id] = t.is_active ? 'pending' : 'skipped' })
+    setBatchRunStatuses(prev => (merge ? { ...prev, ...statuses } : statuses))
+    setBatchRunErrors({})
+    setBatchRunDrawerOpen(true)
+    const activeCount = accounts.filter((t: any) => t.is_active).length
+    message.info('开始批量执行 ' + activeCount + ' 个账号（限并发3）...')
+
+    const queue = accounts.filter((t: any) => t.is_active)
+    const worker = async () => {
+      while (true) {
+        const t = queue.shift()
+        if (!t) return
+        setBatchRunStatuses(prev => ({ ...prev, [t.id]: 'running' }))
+        try {
+          const res = await scheduleAPI.runNow(t.id, 'social_media', start.toISOString(), end.toISOString())
+          const { result_id } = res.data
+          let settled = false
+          for (let i = 0; i < 60; i++) {
+            await new Promise(r => setTimeout(r, 2000))
+            try {
+              const detailRes = await resultsAPI.detail(result_id)
+              const status = detailRes.data?.status
+              if (status === 'success') {
+                setBatchRunStatuses(prev => ({ ...prev, [t.id]: 'success' }))
+                settled = true
+                break
+              }
+              if (status === 'failed') {
+                setBatchRunStatuses(prev => ({ ...prev, [t.id]: 'failed' }))
+                setBatchRunErrors(prev => ({ ...prev, [t.id]: detailRes.data?.error_message || '监测失败' }))
+                settled = true
+                break
+              }
+            } catch {}
+          }
+          if (!settled) {
+            setBatchRunStatuses(prev => ({ ...prev, [t.id]: 'failed' }))
+            setBatchRunErrors(prev => ({ ...prev, [t.id]: '轮询超时，结果未在2分钟内写入' }))
+          }
+        } catch (e: any) {
+          setBatchRunStatuses(prev => ({ ...prev, [t.id]: 'failed' }))
+          setBatchRunErrors(prev => ({ ...prev, [t.id]: e?.response?.data?.detail || '监测启动失败' }))
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: 3 }, () => worker()))
+    fetchTargets()
+    message.success('批量执行完成')
+  }
+
+  const retryBatchFailed = () => {
+    if (!batchRunRange) return
+    const failedIds = Object.entries(batchRunStatuses)
+      .filter(([, s]) => s === 'failed')
+      .map(([id]) => Number(id))
+    if (failedIds.length === 0) {
+      message.info('没有失败的账号')
+      return
+    }
+    const accounts = filtered.filter((t: any) => failedIds.includes(t.id))
+    startBatchRun(accounts, batchRunRange[0], batchRunRange[1], true)
+  }
+
   const openEditModal = (target: any) => {
     setEditingTarget(target)
     form.setFieldsValue(target)
@@ -626,6 +750,104 @@ export default function SocialAccountsPage() {
   const filtered = searchQuery.trim()
     ? targets.filter((t: any) => (t.account_name || '').toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : targets
+
+  // ── 平台分区 ─────────────────────────────────────────────
+  const grouped = (() => {
+    const map: Record<string, any[]> = {}
+    for (const t of filtered) {
+      const key = t.platform || 'other'
+      if (!map[key]) map[key] = []
+      map[key].push(t)
+    }
+    return map
+  })()
+
+  const sectionPlatforms = (() => {
+    const known = Object.keys(grouped).filter(key => platformMap[key])
+    const others = Object.keys(grouped).filter(key => !platformMap[key])
+    if (platformOrder) {
+      const ordered = platformOrder.filter(key => known.includes(key))
+      const rest = known.filter(key => !platformOrder.includes(key))
+      rest.sort((a, b) => grouped[b].length - grouped[a].length)
+      return [...ordered, ...rest, ...others]
+    }
+    known.sort((a, b) => grouped[b].length - grouped[a].length)
+    return [...known, ...others]
+  })()
+
+  const activeCountOf = (key: string) => (grouped[key] || []).filter((t: any) => t.is_active).length
+
+  const toggleCollapse = (key: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      try { localStorage.setItem('soc_section_collapsed', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  const persistOrder = async (order: string[]) => {
+    setPlatformOrder(order)
+    setOrderSaving(true)
+    try {
+      await platformPrefsAPI.save(order.map((key, i) => ({ platform: key, sort_order: i })))
+    } catch {
+      message.error('排序保存失败')
+    } finally {
+      setOrderSaving(false)
+    }
+  }
+
+  const pinPlatform = (key: string) => {
+    const idx = sectionPlatforms.indexOf(key)
+    if (idx <= 0) return
+    const rest = sectionPlatforms.filter(k => k !== key)
+    persistOrder([key, ...rest])
+  }
+
+  const handleDragStart = (e: any, key: string) => {
+    setDragPlatform(key)
+    e.dataTransfer.effectAllowed = 'move'
+    try { e.dataTransfer.setData('text/plain', key) } catch {}
+  }
+
+  const handleDropOnSection = (e: any, targetKey: string) => {
+    e.preventDefault()
+    const from = dragPlatform
+    setDragPlatform(null)
+    setDragOverPlatform(null)
+    if (!from || from === targetKey) return
+    const next = [...sectionPlatforms]
+    const fromIdx = next.indexOf(from)
+    const toIdx = next.indexOf(targetKey)
+    if (fromIdx < 0 || toIdx < 0) return
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, from)
+    persistOrder(next)
+  }
+
+  const resetOrder = async () => {
+    setPlatformOrder(null)
+    try {
+      await platformPrefsAPI.reset()
+      message.success('已恢复默认排序')
+    } catch {
+      message.error('恢复默认排序失败')
+    }
+  }
+
+  // ── 一键启停 ─────────────────────────────────────────────
+  const handleToggleActive = async (target: any, checked: boolean) => {
+    setTogglingIds(prev => [...prev, target.id])
+    try {
+      await targetsAPI.update(target.id, { is_active: checked })
+      setTargets(prev => prev.map(t => (t.id === target.id ? { ...t, is_active: checked } : t)))
+      message.success(target.account_name + (checked ? ' 已启用' : ' 已停用'))
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '切换失败，已还原')
+    } finally {
+      setTogglingIds(prev => prev.filter(id => id !== target.id))
+    }
+  }
 
   const handleBatchUpdate = async () => {
     if (filtered.length === 0) return
@@ -731,21 +953,112 @@ export default function SocialAccountsPage() {
           暂无社交账号，点击"添加账号"开始监控
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {filtered.map((target, idx) => (
-            <AccountCard
-              key={target.id}
-              target={target}
-              running={runningId === target.id}
-              syncing={syncingId === target.id}
-              onRun={() => openRunModal(target)}
-              onSync={() => openSyncModal(target)}
-              onEdit={() => openEditModal(target)}
-              onDelete={() => handleDelete(target.id)}
-              onDetail={() => navigate(`/detail/social_media/${target.id}`)}
-              idx={idx}
-            />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {platformOrder && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -4 }}>
+              <Button size="small" type="text" icon={<VerticalAlignTopOutlined />} loading={orderSaving} onClick={resetOrder}>
+                恢复默认排序
+              </Button>
+            </div>
+          )}
+          {sectionPlatforms.map(plat => {
+            const accounts = grouped[plat] || []
+            const platInfo = platformMap[plat] || { label: '其他', color: '#666' }
+            const collapsed = !!collapsedSections[plat]
+            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook'
+            const activeCount = activeCountOf(plat)
+            const isDragOver = dragOverPlatform === plat && dragPlatform !== plat
+            return (
+              <div key={plat} className="animate-fade-in-up" style={{
+                background: 'var(--surface-0, #fff)',
+                borderRadius: 16,
+                border: isDragOver ? `1px dashed ${platInfo.color}` : '1px solid var(--border)',
+                overflow: 'hidden',
+                transition: 'border-color 0.2s ease',
+              }}>
+                {/* 分区标题栏：拖拽排序 / 置顶 / 全部立即执行 / 折叠 */}
+                <div
+                  onClick={() => toggleCollapse(plat)}
+                  onDragOver={e => { if (dragPlatform && dragPlatform !== plat) { e.preventDefault(); setDragOverPlatform(plat) } }}
+                  onDragLeave={() => setDragOverPlatform(null)}
+                  onDrop={e => handleDropOnSection(e, plat)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '14px 20px',
+                    cursor: 'pointer',
+                    background: 'var(--surface-1)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <span
+                    draggable
+                    onDragStart={e => handleDragStart(e, plat)}
+                    onDragEnd={() => { setDragPlatform(null); setDragOverPlatform(null) }}
+                    onClick={e => e.stopPropagation()}
+                    title="拖拽排序"
+                    style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    <HolderOutlined />
+                  </span>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '5px 14px 5px 10px', borderRadius: 20,
+                    background: `${platInfo.color}12`, border: `1px solid ${platInfo.color}20`,
+                  }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: platInfo.color }} />
+                    <Text style={{ color: platInfo.color, fontSize: 12, fontWeight: 700 }}>{platInfo.label}</Text>
+                  </div>
+                  <Text style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15, flex: 1 }}>
+                    {accounts.length} 个账号
+                  </Text>
+                  <Tooltip title="置顶该平台">
+                    <Button
+                      type="text" size="small"
+                      icon={<PushpinOutlined />}
+                      disabled={sectionPlatforms.indexOf(plat) === 0}
+                      onClick={e => { e.stopPropagation(); pinPlatform(plat) }}
+                      style={{ color: '#0f766e' }}
+                    />
+                  </Tooltip>
+                  {canRunNow && (
+                    <Tooltip title={'全部立即执行（' + activeCount + ' 个启用账号）'}>
+                      <Button
+                        type="text" size="small"
+                        icon={<PlayCircleOutlined />}
+                        disabled={activeCount === 0}
+                        loading={accounts.some((t: any) => batchRunStatuses[t.id] === 'running')}
+                        onClick={e => { e.stopPropagation(); openBatchRunModal(plat) }}
+                        style={{ color: '#3370ff' }}
+                      >
+                        全部立即执行
+                      </Button>
+                    </Tooltip>
+                  )}
+                  {collapsed ? <RightOutlined style={{ color: 'var(--text-muted)' }} /> : <DownOutlined style={{ color: 'var(--text-muted)' }} />}
+                </div>
+                {!collapsed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 18 }}>
+                    {accounts.map((target: any, idx: number) => (
+                      <AccountCard
+                        key={target.id}
+                        target={target}
+                        running={runningId === target.id}
+                        syncing={syncingId === target.id}
+                        togglingActive={togglingIds.includes(target.id)}
+                        onToggleActive={(checked: boolean) => handleToggleActive(target, checked)}
+                        onRun={() => openRunModal(target)}
+                        onSync={() => openSyncModal(target)}
+                        onEdit={() => openEditModal(target)}
+                        onDelete={() => handleDelete(target.id)}
+                        onDetail={() => navigate('/detail/social_media/' + target.id)}
+                        idx={idx}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -873,7 +1186,13 @@ export default function SocialAccountsPage() {
 
       {/* 立即执行：时间范围筛选弹窗（默认近24小时） */}
       <Modal
-        title={runTarget ? '立即执行：' + runTarget.account_name : '立即执行'}
+        title={
+          batchRunPlatform
+            ? '批量执行：' + (platformMap[batchRunPlatform]?.label || batchRunPlatform) + ' 平台'
+            : runTarget
+              ? '立即执行：' + runTarget.account_name
+              : '立即执行'
+        }
         open={runModalOpen}
         onOk={confirmRun}
         onCancel={() => setRunModalOpen(false)}
@@ -886,6 +1205,7 @@ export default function SocialAccountsPage() {
           <div>
             <Text type="secondary" style={{ fontSize: 13 }}>
               选择数据时间范围，仅获取该时间段内发布的贴文（默认近24小时）
+              {batchRunPlatform && ('；将对 ' + activeCountOf(batchRunPlatform) + ' 个启用账号逐个执行')}
             </Text>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
               {runTimePresets.map(p => (
@@ -1051,6 +1371,74 @@ export default function SocialAccountsPage() {
             </div>
           </div>
         )}
+      </Drawer>
+
+      {/* 批量立即执行进度抽屉 */}
+      <Drawer
+        open={batchRunDrawerOpen}
+        onClose={() => setBatchRunDrawerOpen(false)}
+        width={560}
+        title={
+          batchRunPlatform
+            ? '批量执行 · ' + (platformMap[batchRunPlatform]?.label || batchRunPlatform)
+            : '批量执行进度'
+        }
+      >
+        {(() => {
+          const entries = filtered.filter((t: any) => batchRunStatuses[t.id] !== undefined)
+          const count = (s: string) => entries.filter((t: any) => batchRunStatuses[t.id] === s).length
+          const done = count('success') + count('failed') + count('skipped')
+          const running = count('running')
+          const hasFailed = count('failed') > 0
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Tag color="default">共 {entries.length} 个</Tag>
+                <Tag color="green">成功 {count('success')}</Tag>
+                <Tag color="red">失败 {count('failed')}</Tag>
+                <Tag color="blue">进行中 {running}</Tag>
+                <Tag>跳过(停用) {count('skipped')}</Tag>
+                {done === entries.length && (
+                  <Button size="small" icon={<SyncOutlined />} disabled={!hasFailed} onClick={retryBatchFailed}>
+                    重试失败
+                  </Button>
+                )}
+              </div>
+              {entries.map((t: any) => {
+                const s = batchRunStatuses[t.id]
+                const err = batchRunErrors[t.id]
+                const icon = s === 'success'
+                  ? <CheckCircleOutlined style={{ color: '#22C55E' }} />
+                  : s === 'failed'
+                    ? <CloseCircleOutlined style={{ color: '#c75050' }} />
+                    : s === 'running'
+                      ? <LoadingOutlined spin style={{ color: '#3370ff' }} />
+                      : s === 'skipped'
+                        ? <PauseCircleOutlined style={{ color: '#8c8c8c' }} />
+                        : <ClockCircleOutlined style={{ color: '#8c8c8c' }} />
+                const label = s === 'success' ? '成功' : s === 'failed' ? '失败' : s === 'running' ? '执行中' : s === 'skipped' ? '跳过(停用)' : '等待中'
+                return (
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px', borderRadius: 10,
+                    background: 'var(--surface-1)', border: '1px solid var(--border)',
+                  }}>
+                    {icon}
+                    <Text style={{ color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.account_name}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</Text>
+                    {err && (
+                      <Tooltip title={err}>
+                        <Text style={{ fontSize: 12, color: '#c75050' }}>详情</Text>
+                      </Tooltip>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </Drawer>
 
       {/* Add/Edit modal */}

@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db, engine
-from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu, facebook
+from routers import auth, targets, websites, results, dashboard, schedule, settings, tools, hot_topics, sentiment, intelligence, account_match, weather, feishu, facebook, platform_prefs
 from services.scheduler import setup_scheduler, refresh_jobs
 from services.feishu import start_feishu_client, stop_feishu_client
 
@@ -162,6 +162,18 @@ async def _ensure_schema():
             "SELECT push_enabled FROM website_targets LIMIT 0",
             "ALTER TABLE website_targets ADD COLUMN push_enabled BOOLEAN DEFAULT 1",
         ),
+        (
+            "platform_prefs",
+            "SELECT 1 FROM platform_prefs LIMIT 0",
+            """CREATE TABLE IF NOT EXISTS platform_prefs (
+                id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+                platform VARCHAR(20) NOT NULL, sort_order INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                FOREIGN KEY(user_id) REFERENCES users (id)
+            )""",
+        ),
     ]
 
     async with engine.begin() as conn:
@@ -207,6 +219,7 @@ app.include_router(account_match.router)
 app.include_router(weather.router)
 app.include_router(feishu.router)
 app.include_router(facebook.router)
+app.include_router(platform_prefs.router)
 
 # Serve frontend static files
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
