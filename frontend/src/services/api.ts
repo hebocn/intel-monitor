@@ -42,8 +42,20 @@ export const targetsAPI = {
   runNow: (id: number) => api.post(`/schedule/run/${id}`, null, { params: { target_type: 'social_media' } }),
   batchUpdate: (data: { target_ids: number[]; is_active?: boolean; push_enabled?: boolean }) =>
     api.post('/targets/batch-update', data),
+  setTags: (targetId: number, tagIds: number[]) =>
+    api.put(`/targets/${targetId}/tags`, { tag_ids: tagIds }),
+  batchTags: (data: { target_ids: number[]; add_tag_ids?: number[]; remove_tag_ids?: number[] }) =>
+    api.post('/targets/batch-tags', data),
   importTemplate: () => api.get('/targets/import/template', { responseType: 'blob' }),
   importBatch: (formData: FormData) => api.post('/targets/import', formData, { timeout: 120000 }),
+}
+
+// Tags (社交账号标签)
+export const tagsAPI = {
+  list: () => api.get('/tags'),
+  create: (data: { name: string; color: string }) => api.post('/tags', data),
+  update: (id: number, data: { name?: string; color?: string }) => api.put(`/tags/${id}`, data),
+  remove: (id: number) => api.delete(`/tags/${id}`),
 }
 
 // Platform prefs (社交账号平台分区排序)

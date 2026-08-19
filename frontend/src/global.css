@@ -749,6 +749,13 @@ button, a, .ant-menu-item, .ant-select-item, .ant-btn, .ant-table-row {
 .import-alert-info .ant-alert-description { color: var(--text-secondary) !important; }
 .import-alert-info .ant-alert-icon { color: #3370ff !important; }
 
+/* ===== Tag filter select — 与搜索框等高（44px）且内容垂直居中 ===== */
+.tag-filter-select .ant-select-selector {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
 /* Markdown rendering — AI 分析摘要 */
 .markdown-body h1 { font-size: 20px; font-weight: 700; margin: 16px 0 10px; color: var(--text-primary); line-height: 1.4; }
 .markdown-body h2 { font-size: 17px; font-weight: 700; margin: 18px 0 8px; color: var(--text-primary); padding-bottom: 6px; border-bottom: 1px solid var(--border); }

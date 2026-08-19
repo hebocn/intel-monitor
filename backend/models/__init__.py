@@ -1,6 +1,7 @@
 # intel-monitor/backend/models/__init__.py
 from models.user import User
 from models.target import Target
+from models.tag import Tag, target_tags
 from models.website import WebsiteTarget
 from models.result import MonitorResult
 from models.comment import HotComment
@@ -19,5 +20,5 @@ __all__ = [
     "HotTopicSource", "HotTopic", "SentimentTask", "SentimentPost", "PlatformStats",
     "IntelligenceCategory", "IntelligenceReport",
     "AccountMatchTask", "AccountMatchCandidate", "AccountMatchResult",
-    "TyphoonTrack",
+    "TyphoonTrack", "Tag", "target_tags",
 ]

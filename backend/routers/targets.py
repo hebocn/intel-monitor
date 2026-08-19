@@ -4,14 +4,16 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, async_session
 from auth import get_current_user
 from models.user import User
 from models.target import Target
+from models.tag import Tag, target_tags
 from schemas.target import TargetCreate, TargetUpdate, TargetResponse
+from schemas.tag import TagBrief, TargetTagSetRequest, TargetTagBatchRequest
 from services.importer import make_target_template, import_targets
 
 router = APIRouter(prefix="/api/targets", tags=["targets"])
@@ -64,6 +66,23 @@ async def _warm_and_verify(target_id: int):
         await db.commit()
 
 
+async def _attach_tags(db: AsyncSession, targets: list[Target]) -> None:
+    """批量查询账号-标签关联并挂到 ORM 对象上（供 TargetResponse 序列化）。"""
+    if not targets:
+        return
+    rows = await db.execute(
+        select(target_tags.c.target_id, Tag)
+        .join(Tag, Tag.id == target_tags.c.tag_id)
+        .where(target_tags.c.target_id.in_([t.id for t in targets]))
+        .order_by(Tag.created_at.asc(), Tag.id.asc())
+    )
+    by_target: dict[int, list[TagBrief]] = {}
+    for target_id, tag in rows.all():
+        by_target.setdefault(target_id, []).append(TagBrief.model_validate(tag))
+    for t in targets:
+        setattr(t, "tags", by_target.get(t.id, []))
+
+
 @router.get("", response_model=list[TargetResponse])
 async def list_targets(
     platform: str | None = None,
@@ -75,7 +94,9 @@ async def list_targets(
         query = query.where(Target.platform == platform)
     query = query.order_by(Target.created_at.desc())
     result = await db.execute(query)
-    return result.scalars().all()
+    targets = result.scalars().all()
+    await _attach_tags(db, list(targets))
+    return targets
 
 
 @router.post("", response_model=TargetResponse, status_code=status.HTTP_201_CREATED)
@@ -89,6 +110,7 @@ async def create_target(
     db.add(target)
     await db.commit()
     await db.refresh(target)
+    setattr(target, "tags", [])
 
     # Trigger async pre-warm and verification
     background_tasks.add_task(_warm_and_verify, target.id)
@@ -152,6 +174,7 @@ async def update_target(
         setattr(target, field, value)
     await db.commit()
     await db.refresh(target)
+    await _attach_tags(db, [target])
     return target
 
 
@@ -167,8 +190,90 @@ async def delete_target(
     target = result.scalar_one_or_none()
     if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target not found")
+    await db.execute(delete(target_tags).where(target_tags.c.target_id == target_id))
     await db.delete(target)
     await db.commit()
+
+
+# ── 账号打标签 ─────────────────────────────────────────────
+
+async def _validate_owned_tags(db: AsyncSession, user_id: int, tag_ids: list[int]) -> list[Tag]:
+    if not tag_ids:
+        return []
+    result = await db.execute(
+        select(Tag).where(Tag.user_id == user_id, Tag.id.in_(tag_ids))
+    )
+    tags = result.scalars().all()
+    if len(tags) != len(set(tag_ids)):
+        raise HTTPException(status_code=400, detail="存在无效或不属于当前用户的标签")
+    return tags
+
+
+@router.put("/{target_id}/tags", response_model=TargetResponse)
+async def set_target_tags(
+    target_id: int,
+    req: TargetTagSetRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """整体替换单个账号的标签集合。"""
+    result = await db.execute(
+        select(Target).where(Target.id == target_id, Target.user_id == user.id)
+    )
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target not found")
+
+    await _validate_owned_tags(db, user.id, req.tag_ids)
+    await db.execute(delete(target_tags).where(target_tags.c.target_id == target_id))
+    for tag_id in dict.fromkeys(req.tag_ids):  # 去重保序
+        await db.execute(target_tags.insert().values(target_id=target_id, tag_id=tag_id))
+    await db.commit()
+    await db.refresh(target)
+    await _attach_tags(db, [target])
+    return target
+
+
+@router.post("/batch-tags")
+async def batch_set_target_tags(
+    req: TargetTagBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """批量为多个账号添加/移除标签。"""
+    if not req.add_tag_ids and not req.remove_tag_ids:
+        raise HTTPException(status_code=400, detail="请至少选择要添加或移除的标签")
+
+    result = await db.execute(
+        select(Target).where(Target.id.in_(req.target_ids), Target.user_id == user.id)
+    )
+    targets = result.scalars().all()
+    if not targets:
+        raise HTTPException(status_code=404, detail="未找到匹配的社交账号目标")
+    target_ids = [t.id for t in targets]
+
+    await _validate_owned_tags(db, user.id, req.add_tag_ids + req.remove_tag_ids)
+    if req.remove_tag_ids:
+        await db.execute(
+            delete(target_tags).where(
+                target_tags.c.target_id.in_(target_ids),
+                target_tags.c.tag_id.in_(req.remove_tag_ids),
+            )
+        )
+    if req.add_tag_ids:
+        existing = await db.execute(
+            select(target_tags.c.target_id, target_tags.c.tag_id).where(
+                target_tags.c.target_id.in_(target_ids),
+                target_tags.c.tag_id.in_(req.add_tag_ids),
+            )
+        )
+        existing_pairs = set(existing.all())
+        for tid in target_ids:
+            for tag_id in dict.fromkeys(req.add_tag_ids):
+                if (tid, tag_id) not in existing_pairs:
+                    await db.execute(target_tags.insert().values(target_id=tid, tag_id=tag_id))
+    await db.commit()
+    return {"updated": len(target_ids)}
 
 
 # ── 批量导入 ─────────────────────────────────────────────
