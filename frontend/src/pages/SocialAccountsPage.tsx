@@ -8,7 +8,7 @@ import {
   UploadOutlined, FileExcelOutlined,
   HolderOutlined, PushpinOutlined, DownOutlined, RightOutlined, CloseCircleOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI, platformPrefsAPI } from '../services/api'
+import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI, platformPrefsAPI, accountPrefsAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { formatBeijingTime, formatBeijingDate } from '../utils/time'
@@ -54,6 +54,13 @@ function AccountCard({
   onDetail,
   onToggleActive,
   togglingActive,
+  onCardDragStart,
+  onCardDragOver,
+  onCardDrop,
+  onCardDragEnd,
+  onPin,
+  pinDisabled,
+  isDragOver,
   idx,
 }: {
   target: any
@@ -66,6 +73,13 @@ function AccountCard({
   onDetail: () => void
   onToggleActive: (checked: boolean) => void
   togglingActive: boolean
+  onCardDragStart: (e: any) => void
+  onCardDragOver: (e: any) => void
+  onCardDrop: (e: any) => void
+  onCardDragEnd: () => void
+  onPin: () => void
+  pinDisabled: boolean
+  isDragOver: boolean
   idx: number
 }) {
   const plat = platformMap[target.platform] || { label: target.platform, color: '#666' }
@@ -82,12 +96,14 @@ function AccountCard({
       style={{
         background: 'var(--surface-0, #fff)',
         borderRadius: 16,
-        border: '1px solid var(--border)',
+        border: isDragOver ? '1px dashed ' + plat.color : '1px solid var(--border)',
         overflow: 'hidden',
         opacity: target.is_active ? 1 : 0.6,
         transition: 'all 0.2s ease',
         position: 'relative',
       }}
+      onDragOver={onCardDragOver}
+      onDrop={onCardDrop}
       onMouseEnter={e => {
         e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.06)'
         e.currentTarget.style.transform = 'translateY(-2px)'
@@ -110,6 +126,18 @@ function AccountCard({
         padding: '18px 22px 14px 22px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* 拖拽手柄(分区内排序) */}
+          <span
+            draggable
+            onDragStart={onCardDragStart}
+            onDragEnd={onCardDragEnd}
+            onClick={e => e.stopPropagation()}
+            title="拖拽排序"
+            style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+          >
+            <HolderOutlined />
+          </span>
+
           {/* Platform badge */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -163,6 +191,16 @@ function AccountCard({
           </div>
 
           {/* Actions */}
+          <Tooltip title="置顶该账号（分区内）">
+            <Button
+              type="text"
+              size="small"
+              icon={<PushpinOutlined />}
+              disabled={pinDisabled}
+              onClick={onPin}
+              style={{ color: '#0f766e' }}
+            />
+          </Tooltip>
           <Tooltip title="立即执行">
             <Button
               type="text"
@@ -317,6 +355,10 @@ export default function SocialAccountsPage() {
   const [batchRunErrors, setBatchRunErrors] = useState<Record<number, string>>({})
   const [batchRunDrawerOpen, setBatchRunDrawerOpen] = useState(false)
   const [batchRunRange, setBatchRunRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
+  // 平台分区内账号排序(platform -> 已排序的 target id 列表)
+  const [accountOrders, setAccountOrders] = useState<Record<string, number[]>>({})
+  const [accountDragId, setAccountDragId] = useState<number | null>(null)
+  const [accountDragOverId, setAccountDragOverId] = useState<number | null>(null)
 
   const handleFbSearch = async () => {
     const nickname = form.getFieldValue('account_name')
@@ -364,6 +406,20 @@ export default function SocialAccountsPage() {
     platformPrefsAPI.list().then(res => {
       if (Array.isArray(res.data) && res.data.length > 0) {
         setPlatformOrder(res.data.map((i: any) => i.platform))
+      }
+    }).catch(() => {})
+  }, [])
+
+  // 加载平台分区内账号排序
+  useEffect(() => {
+    accountPrefsAPI.list().then(res => {
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        const map: Record<string, number[]> = {}
+        for (const item of res.data) {
+          if (!map[item.platform]) map[item.platform] = []
+          map[item.platform].push(item.target_id)
+        }
+        setAccountOrders(map)
       }
     }).catch(() => {})
   }, [])
@@ -777,6 +833,19 @@ export default function SocialAccountsPage() {
 
   const activeCountOf = (key: string) => (grouped[key] || []).filter((t: any) => t.is_active).length
 
+  // 应用已保存的账号排序:已排序的在前,其余按原顺序(created_at desc)接续
+  const orderedAccountsFor = (platform: string, accounts: any[]) => {
+    const saved = accountOrders[platform] || []
+    if (!saved.length) return accounts
+    const byId = new Map<number, any>(accounts.map((a: any) => [a.id, a]))
+    const ordered = saved.map(id => byId.get(id)).filter((a): a is any => !!a)
+    const rest = accounts.filter((a: any) => !saved.includes(a.id))
+    return [...ordered, ...rest]
+  }
+
+  // 该平台的全部账号(不受搜索过滤影响,用于拖拽/置顶时计算完整顺序)
+  const fullAccountsOf = (platform: string) => targets.filter((t: any) => t.platform === platform)
+
   const toggleCollapse = (key: string) => {
     setCollapsedSections(prev => {
       const next = { ...prev, [key]: !prev[key] }
@@ -847,6 +916,61 @@ export default function SocialAccountsPage() {
     } finally {
       setTogglingIds(prev => prev.filter(id => id !== target.id))
     }
+  }
+
+  // ── 分区内账号排序(拖拽/置顶) ──────────────────────────────
+  const persistAccountOrder = async (platform: string, ids: number[]) => {
+    setAccountOrders(prev => ({ ...prev, [platform]: ids }))
+    try {
+      await accountPrefsAPI.save(platform, ids.map((id, i) => ({ target_id: id, sort_order: i })))
+    } catch {
+      message.error('账号排序保存失败')
+    }
+  }
+
+  const handleAccountDragStart = (e: any, target: any) => {
+    setAccountDragId(target.id)
+    e.dataTransfer.effectAllowed = 'move'
+    try { e.dataTransfer.setData('text/plain', String(target.id)) } catch {}
+  }
+
+  const handleAccountDragOver = (e: any, target: any) => {
+    if (accountDragId && accountDragId !== target.id) {
+      e.preventDefault()
+      setAccountDragOverId(target.id)
+    }
+  }
+
+  const handleAccountDrop = (e: any, target: any) => {
+    e.preventDefault()
+    const from = accountDragId
+    const to = target.id
+    setAccountDragId(null)
+    setAccountDragOverId(null)
+    if (!from || from === to) return
+    const platform = target.platform
+    const full = orderedAccountsFor(platform, fullAccountsOf(platform))
+    const fromIdx = full.findIndex((a: any) => a.id === from)
+    const toIdx = full.findIndex((a: any) => a.id === to)
+    if (fromIdx < 0 || toIdx < 0) return
+    const [moved] = full.splice(fromIdx, 1)
+    full.splice(toIdx, 0, moved)
+    persistAccountOrder(platform, full.map((a: any) => a.id))
+  }
+
+  const handleAccountDragEnd = () => {
+    setAccountDragId(null)
+    setAccountDragOverId(null)
+  }
+
+  const pinAccount = (target: any) => {
+    const platform = target.platform
+    const full = orderedAccountsFor(platform, fullAccountsOf(platform))
+    const idx = full.findIndex((a: any) => a.id === target.id)
+    if (idx <= 0) return
+    const [moved] = full.splice(idx, 1)
+    full.unshift(moved)
+    persistAccountOrder(platform, full.map((a: any) => a.id))
   }
 
   const handleBatchUpdate = async () => {
@@ -1038,7 +1162,7 @@ export default function SocialAccountsPage() {
                 </div>
                 {!collapsed && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 18 }}>
-                    {accounts.map((target: any, idx: number) => (
+                    {orderedAccountsFor(plat, accounts).map((target: any, idx: number) => (
                       <AccountCard
                         key={target.id}
                         target={target}
@@ -1046,6 +1170,13 @@ export default function SocialAccountsPage() {
                         syncing={syncingId === target.id}
                         togglingActive={togglingIds.includes(target.id)}
                         onToggleActive={(checked: boolean) => handleToggleActive(target, checked)}
+                        onCardDragStart={(e: any) => handleAccountDragStart(e, target)}
+                        onCardDragOver={(e: any) => handleAccountDragOver(e, target)}
+                        onCardDrop={(e: any) => handleAccountDrop(e, target)}
+                        onCardDragEnd={handleAccountDragEnd}
+                        onPin={() => pinAccount(target)}
+                        pinDisabled={orderedAccountsFor(plat, accounts)[0]?.id === target.id}
+                        isDragOver={accountDragOverId === target.id && accountDragId !== target.id}
                         onRun={() => openRunModal(target)}
                         onSync={() => openSyncModal(target)}
                         onEdit={() => openEditModal(target)}

@@ -53,6 +53,14 @@ export const platformPrefsAPI = {
   reset: () => api.delete('/platform-prefs'),
 }
 
+// Account prefs (平台分区内账号排序)
+export const accountPrefsAPI = {
+  list: (platform?: string) => api.get('/account-prefs', { params: { platform } }),
+  save: (platform: string, items: { target_id: number; sort_order: number }[]) =>
+    api.put('/account-prefs', { platform, items }),
+  reset: (platform?: string) => api.delete('/account-prefs', { params: { platform } }),
+}
+
 // Facebook (账号反查候选)
 export const facebookAPI = {
   searchAccounts: (nickname: string, limit = 8) =>
