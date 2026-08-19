@@ -20,6 +20,9 @@ class CrawlerEntry:
     platforms: frozenset[str]
     crawl: Callable[..., Coroutine[Any, Any, CrawlResult]]
     available: Callable[[], Coroutine[Any, Any, bool]]
+    # 声明该爬虫支持绝对时间窗口（time_start/time_end），用于在越过
+    # 窗口下界时提前停止采集（如 Facebook 模拟人滚动），避免窗口外过度抓取。
+    accepts_time_window: bool = False
 
 
 class CrawlerRouter:
@@ -30,9 +33,19 @@ class CrawlerRouter:
         self.entries.append(entry)
 
     async def crawl(
-        self, platform: str, account_name: str, account_url: str, post_limit: int = 10
+        self,
+        platform: str,
+        account_name: str,
+        account_url: str,
+        post_limit: int = 10,
+        time_start=None,
+        time_end=None,
     ) -> tuple[CrawlResult | None, str, list[str]]:
-        """Try each entry in priority order. Returns (result, method_name, error_log)."""
+        """Try each entry in priority order. Returns (result, method_name, error_log).
+
+        time_start/time_end: 绝对时间窗口（naive UTC）。仅传给声明
+        accepts_time_window 的爬虫，供其在越过窗口下界时提前停止。
+        """
         error_log: list[str] = []
 
         for entry in self.entries:
@@ -49,7 +62,13 @@ class CrawlerRouter:
 
             logger.info(f"[{account_name}] trying {entry.name} (platform={platform})")
             try:
-                result = await entry.crawl(platform, account_name, account_url, post_limit)
+                if entry.accepts_time_window:
+                    result = await entry.crawl(
+                        platform, account_name, account_url, post_limit,
+                        time_start=time_start, time_end=time_end,
+                    )
+                else:
+                    result = await entry.crawl(platform, account_name, account_url, post_limit)
                 if result.success:
                     logger.info(f"[{account_name}] {entry.name} success: {len(result.posts)} posts")
                     return result, entry.name, error_log

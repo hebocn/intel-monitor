@@ -41,7 +41,10 @@ async def crawl_with_fallback(
 
     has_window = time_start is not None or time_end is not None
     fetch_limit = max(post_limit, 100) if has_window else post_limit
-    result, method, error_log = await router.crawl(platform, account_name, account_url, fetch_limit)
+    result, method, error_log = await router.crawl(
+        platform, account_name, account_url, fetch_limit,
+        time_start=time_start, time_end=time_end,
+    )
 
     if result and result.success:
         # 时间窗口模式下返回窗口内全部匹配帖子（上限 200），不受目标 post_limit 截断

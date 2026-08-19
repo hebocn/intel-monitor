@@ -5,9 +5,12 @@ CDP Proxy 爬虫 - 直接调用 web-access skill 的 CDP Proxy API
 """
 import json
 import asyncio
+import logging
 import httpx
 from crawlers.base import CrawlResult, PostData, CommentData
 from crawlers.router import CrawlerEntry
+
+logger = logging.getLogger(__name__)
 
 CDP_PROXY_URL = "http://localhost:3456"
 
@@ -427,8 +430,17 @@ def _parse_fb_time(time_str: str, inner_text: str = "") -> "datetime | None":
     return parse_relative_time(text)
 
 
-async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> CrawlResult:
-    """模拟人浏览：激活标签页 → 关闭弹层 → 真实滚轮滚动 → 边滚边提取。"""
+async def crawl_facebook_with_cdp(
+    account_url: str,
+    post_limit: int = 10,
+    time_start=None,
+    time_end=None,
+) -> CrawlResult:
+    """模拟人浏览：激活标签页 → 关闭弹层 → 真实滚轮滚动 → 边滚边提取。
+
+    time_start: 绝对时间窗口下界（naive UTC）。指定后滚动过程中连续 5 条
+    新帖早于 time_start 即判定已越过窗口，提前停止滚动，不再加载窗口之外的旧帖。
+    """
     if not await _check_cdp_proxy():
         return CrawlResult(
             success=False,
@@ -463,6 +475,7 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
         # 连续 6 轮（约 30 秒）无新帖才判定到底；滚轮瞬时失败不硬停。
         seen: dict[str, dict] = {}
         no_new_rounds = 0
+        out_of_range_streak = 0
         max_rounds = max(25, post_limit * 3)
         for _ in range(max_rounds):
             # 展开折叠的长文（"展开 / 查看更多 / See more"）
@@ -501,6 +514,15 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
                         if key and key not in seen:
                             seen[key] = item
                             new_count += 1
+                            # 解析发布时间（时间窗口模式下用于提前停止）
+                            if time_start is not None:
+                                ts = _parse_fb_time(item.get("timeStr") or "", item.get("innerText") or "")
+                                if ts is not None:
+                                    item["_ts"] = ts
+                                    if ts < time_start:
+                                        out_of_range_streak += 1
+                                    else:
+                                        out_of_range_streak = 0
 
                 if new_count == 0:
                     no_new_rounds += 1
@@ -511,6 +533,12 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
             if no_new_rounds >= 6:
                 break
             if len(seen) >= max(post_limit * 3, 30):
+                break
+            # 越过时间窗口下界（FB 时间线按新→旧排列），提前停止滚动
+            if time_start is not None and out_of_range_streak >= 5:
+                logger.info(
+                    f"[facebook] 已越过时间窗口下界 {time_start}，连续 {out_of_range_streak} 条更旧新帖，停止滚动"
+                )
                 break
 
         if not seen:
@@ -530,7 +558,7 @@ async def crawl_facebook_with_cdp(account_url: str, post_limit: int = 10) -> Cra
                 comments_count=item.get("comments") or 0,
                 shares=item.get("shares") or 0,
                 images=list(item.get("images") or [])[:5],
-                published_at=_parse_fb_time(item.get("timeStr") or "", item.get("innerText") or ""),
+                published_at=item.get("_ts") or _parse_fb_time(item.get("timeStr") or "", item.get("innerText") or ""),
             ))
 
         return CrawlResult(posts=posts, success=True)
@@ -594,11 +622,13 @@ def build_cdp_entry() -> CrawlerEntry:
     async def _check():
         return await _check_cdp_proxy()
 
-    async def _crawl(platform, account_name, account_url, post_limit=10):
+    async def _crawl(platform, account_name, account_url, post_limit=10, time_start=None, time_end=None):
         if platform == "x":
             return await crawl_x_with_cdp(account_url)
         if platform == "facebook":
-            return await crawl_facebook_with_cdp(account_url, post_limit)
+            return await crawl_facebook_with_cdp(
+                account_url, post_limit, time_start=time_start, time_end=time_end
+            )
         return CrawlResult(success=False, error_message=f"CDP: unsupported platform {platform}")
 
     return CrawlerEntry(
@@ -606,4 +636,5 @@ def build_cdp_entry() -> CrawlerEntry:
         platforms=frozenset({"x", "facebook"}),
         crawl=_crawl,
         available=_check,
+        accepts_time_window=True,
     )
