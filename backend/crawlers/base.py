@@ -187,11 +187,20 @@ def parse_absolute_time(text: str, assume_utc: bool = False) -> datetime | None:
     return None
 
 
-def filter_posts(posts: list, post_limit: int = 10, time_range_days: int = 0) -> list:
+def filter_posts(
+    posts: list,
+    post_limit: int = 10,
+    time_range_days: int = 0,
+    time_start: datetime | None = None,
+    time_end: datetime | None = None,
+) -> list:
     """Filter posts by time range and limit count.
 
     Posts without published_at are excluded when time filtering is active.
     All published_at values are expected to be naive UTC datetimes.
+
+    time_range_days: 相对窗口（近 N 天，调度任务用）
+    time_start/time_end: 绝对时间窗口（naive UTC，"立即执行"时由前端传入）
     """
     filtered = posts
 
@@ -200,6 +209,18 @@ def filter_posts(posts: list, post_limit: int = 10, time_range_days: int = 0) ->
         filtered = [
             p for p in filtered
             if p.published_at is not None and p.published_at >= cutoff
+        ]
+
+    if time_start is not None:
+        filtered = [
+            p for p in filtered
+            if p.published_at is not None and p.published_at >= time_start
+        ]
+
+    if time_end is not None:
+        filtered = [
+            p for p in filtered
+            if p.published_at is not None and p.published_at <= time_end
         ]
 
     return filtered[:post_limit]

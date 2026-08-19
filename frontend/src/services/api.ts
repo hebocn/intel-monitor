@@ -84,8 +84,10 @@ export const dashboardAPI = {
 export const scheduleAPI = {
   status: () => api.get('/schedule/status'),
   refresh: () => api.post('/schedule/refresh'),
-  runNow: (targetId: number, targetType: string) =>
-    api.post(`/schedule/run/${targetId}`, null, { params: { target_type: targetType } }),
+  runNow: (targetId: number, targetType: string, startTime?: string, endTime?: string) =>
+    api.post(`/schedule/run/${targetId}`, null, {
+      params: { target_type: targetType, start_time: startTime, end_time: endTime },
+    }),
   sync: (targetId: number, limit: number) =>
     api.post(`/schedule/sync/${targetId}`, null, { params: { limit }, timeout: 600000 }),
 }

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy import select
@@ -13,6 +13,24 @@ from models.result import MonitorResult
 from services.scheduler import refresh_jobs, get_job_status
 from services.monitor import execute_monitor
 from crawlers.opencli_crawler import crawl_with_opencli, _check_opencli
+from crawlers.base import TZ_SHANGHAI, TZ_UTC
+
+
+def _parse_time_arg(value: str | None) -> datetime | None:
+    """把前端传来的 ISO 时间解析为 naive UTC datetime。
+
+    前端发送带时区偏移的 ISO 8601（如 2025-06-14T08:00:00.000Z 或 +08:00）；
+    若不带时区信息，按北京时间（Asia/Shanghai）处理。
+    """
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的时间参数: {value}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ_SHANGHAI)
+    return dt.astimezone(TZ_UTC).replace(tzinfo=None)
 
 router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
@@ -57,6 +75,8 @@ async def refresh_schedule(user: User = Depends(get_current_user)):
 async def run_now(
     target_id: int,
     target_type: str = "social_media",
+    start_time: str | None = Query(None, description="时间范围起点（ISO 8601，仅社交账号生效）"),
+    end_time: str | None = Query(None, description="时间范围终点（ISO 8601，仅社交账号生效）"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -68,6 +88,12 @@ async def run_now(
         target_check = await db.execute(select(WebsiteTarget).where(WebsiteTarget.id == target_id))
     if not target_check.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Target not found")
+
+    # 解析时间窗口（naive UTC），立即执行时用于筛选贴文
+    time_start = _parse_time_arg(start_time)
+    time_end = _parse_time_arg(end_time)
+    if time_start is not None and time_end is not None and time_start > time_end:
+        raise HTTPException(status_code=400, detail="时间范围无效：开始时间晚于结束时间")
 
     # Create a pending result immediately
     monitor_result = MonitorResult(
@@ -81,7 +107,7 @@ async def run_now(
     await db.refresh(monitor_result)
 
     # Run the actual monitoring in the background
-    background_tasks.add_task(execute_monitor, target_id, target_type)
+    background_tasks.add_task(execute_monitor, target_id, target_type, time_start, time_end)
 
     return {"status": "pending", "result_id": monitor_result.id}
 

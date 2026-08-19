@@ -28,17 +28,28 @@ async def crawl_with_fallback(
     account_url: str,
     post_limit: int = 10,
     post_time_range_days: int = 0,
+    time_start=None,
+    time_end=None,
 ) -> tuple:
     """Try crawlers in priority order via CrawlerRouter.
     Returns (CrawlResult, method_name, error_log).
+
+    time_start/time_end: 绝对时间窗口（naive UTC datetime）。"立即执行"时由前端传入；
+    指定后放宽抓取条数（各平台爬虫自行封顶），保证有足够候选帖子供时间筛选。
     """
     router = get_router()
-    result, method, error_log = await router.crawl(platform, account_name, account_url, post_limit)
+
+    has_window = time_start is not None or time_end is not None
+    fetch_limit = max(post_limit, 100) if has_window else post_limit
+    result, method, error_log = await router.crawl(platform, account_name, account_url, fetch_limit)
 
     if result and result.success:
-        result.posts = filter_posts(result.posts, post_limit, post_time_range_days)
+        # 时间窗口模式下返回窗口内全部匹配帖子（上限 200），不受目标 post_limit 截断
+        result_limit = max(post_limit, 200) if has_window else post_limit
+        result.posts = filter_posts(result.posts, result_limit, post_time_range_days, time_start, time_end)
         img_total = sum(len(p.images) for p in result.posts)
-        logger.info(f"[{account_name}] {method} 成功: {len(result.posts)} 条, {img_total} 张图片")
+        logger.info(f"[{account_name}] {method} 成功: {len(result.posts)} 条, {img_total} 张图片"
+                    + (" (时间窗口筛选)" if has_window else ""))
 
     return result, method, error_log
 
@@ -59,8 +70,12 @@ async def _mark_pending_as_failed(db: AsyncSession, target_id: int, target_type:
         await db.commit()
 
 
-async def execute_monitor(target_id: int, target_type: str = "social_media"):
-    """Execute monitoring for a single target."""
+async def execute_monitor(target_id: int, target_type: str = "social_media", time_start=None, time_end=None):
+    """Execute monitoring for a single target.
+
+    time_start/time_end: 绝对时间窗口（naive UTC），"立即执行"时由前端传入；
+    仅社交账号监测生效，调度任务不传（沿用目标相对时间配置）。
+    """
     async with async_session() as db:
         if target_type == "social_media":
             result = await db.execute(select(Target).where(Target.id == target_id))
@@ -68,7 +83,7 @@ async def execute_monitor(target_id: int, target_type: str = "social_media"):
             if not target:
                 await _mark_pending_as_failed(db, target_id, target_type)
                 return
-            await _monitor_social_target(db, target)
+            await _monitor_social_target(db, target, time_start=time_start, time_end=time_end)
         else:
             result = await db.execute(select(WebsiteTarget).where(WebsiteTarget.id == target_id))
             target = result.scalar_one_or_none()
@@ -78,8 +93,14 @@ async def execute_monitor(target_id: int, target_type: str = "social_media"):
             await _monitor_website_target(db, target)
 
 
-async def _monitor_social_target(db: AsyncSession, target: Target):
-    logger.info(f"=== 开始监控: {target.account_name} (平台: {target.platform}, ID: {target.id}) ===")
+async def _monitor_social_target(db: AsyncSession, target: Target, time_start=None, time_end=None):
+    if time_start is not None or time_end is not None:
+        logger.info(
+            f"=== 开始监控: {target.account_name} (平台: {target.platform}, ID: {target.id}, "
+            f"时间窗口: {time_start} ~ {time_end}) ==="
+        )
+    else:
+        logger.info(f"=== 开始监控: {target.account_name} (平台: {target.platform}, ID: {target.id}) ===")
 
     # Check for an existing pending result (created by run_now endpoint)
     result = await db.execute(
@@ -110,6 +131,8 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             account_url=target.account_url,
             post_limit=getattr(target, 'post_limit', 10),
             post_time_range_days=getattr(target, 'post_time_range_days', 0),
+            time_start=time_start,
+            time_end=time_end,
         )
 
         monitor_result.crawl_method = method
@@ -133,9 +156,13 @@ async def _monitor_social_target(db: AsyncSession, target: Target):
             logger.info(f"[{target.account_name}] 图片示例: {sample_urls}")
 
         # Summarize
-        logger.info(f"[{target.account_name}] 开始生成摘要{'(含图片分析)' if img_count > 0 else ''}")
-        summary = await summarizer.summarize_posts(target.platform, target.account_name, crawl_result.posts)
-        logger.info(f"[{target.account_name}] 摘要完成, 长度: {len(summary)} 字符")
+        if crawl_result.posts:
+            logger.info(f"[{target.account_name}] 开始生成摘要{'(含图片分析)' if img_count > 0 else ''}")
+            summary = await summarizer.summarize_posts(target.platform, target.account_name, crawl_result.posts)
+            logger.info(f"[{target.account_name}] 摘要完成, 长度: {len(summary)} 字符")
+        else:
+            summary = "所选时间范围内无贴文。" if (time_start is not None or time_end is not None) else "今日无新内容发布。"
+            logger.info(f"[{target.account_name}] 时间筛选后无贴文, 跳过摘要")
 
         # Save results
         monitor_result.summary = summary

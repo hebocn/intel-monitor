@@ -15,6 +15,12 @@ const theme: ThemeConfig = {
     colorError: '#EF4444',
     colorWarning: '#F59E0B',
     colorInfo: '#60A5FA',
+    // 深色主题派生色：antd 默认从 colorPrimary 推导出浅色系（如 colorPrimaryBg=#f0fff3），
+    // 在暗色面板上会形成"浅底白字"看不见。这里统一改为深色半透明。
+    colorPrimaryBg: 'rgba(34,197,94,0.15)',
+    colorPrimaryBgHover: 'rgba(34,197,94,0.22)',
+    colorTextDisabled: 'rgba(248,250,252,0.35)',
+    colorFillTertiary: 'rgba(248,250,252,0.08)',
     borderRadius: 12,
     fontSize: 15,
     fontFamily: "'Inter', 'Noto Sans SC', sans-serif",
@@ -95,6 +101,11 @@ const theme: ThemeConfig = {
     Tooltip: {
       colorBgSpotlight: '#111827',
       colorTextLightSolid: '#F8FAFC',
+    },
+    DatePicker: {
+      colorPrimaryBg: 'rgba(34,197,94,0.15)',
+      colorPrimaryBgHover: 'rgba(34,197,94,0.22)',
+      cellRangeBorderColor: '#22C55E',
     },
     Popconfirm: {
       colorBgElevated: '#1A2332',

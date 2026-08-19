@@ -8,6 +8,7 @@ import {
   SearchOutlined, ExperimentOutlined, RiseOutlined,
 } from '@ant-design/icons'
 import { dashboardAPI, scheduleAPI } from '../services/api'
+import { formatBeijingTime } from '../utils/time'
 
 // ══════════════════════════════════════════════════
 // 帮助函数
@@ -575,7 +576,7 @@ function FeedItem({ record, idx }: { record: any; idx: number }) {
                         )}
                         <div className="cockpit-feed-post-card__meta">
                           {post.published_at && (
-                            <span className="cockpit-feed-post-card__time">{post.published_at}</span>
+                            <span className="cockpit-feed-post-card__time">{formatBeijingTime(post.published_at)}</span>
                           )}
                           {post.likes > 0 && (
                             <span className="cockpit-feed-post-card__stat"><HeartOutlined /> {post.likes}</span>

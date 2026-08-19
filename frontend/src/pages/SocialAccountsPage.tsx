@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, Drawer, Segmented, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert } from 'antd'
+import { Button, Modal, Drawer, Segmented, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert, DatePicker } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, LinkOutlined, PauseCircleOutlined,
@@ -9,6 +9,8 @@ import {
 } from '@ant-design/icons'
 import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI } from '../services/api'
 import { useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
+import { formatBeijingTime, formatBeijingDate } from '../utils/time'
 
 const { Text } = Typography
 
@@ -31,6 +33,14 @@ const importanceOptions = [
 
 const importanceMap = Object.fromEntries(importanceOptions.map(i => [i.value, i]))
 const platformMap = Object.fromEntries(platformOptions.map(p => [p.value, p]))
+
+// 立即执行：时间范围快捷预设（默认近24小时）
+const runTimePresets = [
+  { label: '近1小时', hours: 1 },
+  { label: '近24小时', hours: 24 },
+  { label: '近7天', hours: 24 * 7 },
+  { label: '近30天', hours: 24 * 30 },
+]
 
 function AccountCard({
   target,
@@ -252,6 +262,11 @@ export default function SocialAccountsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState<any>(null)
   const [runningId, setRunningId] = useState<number | null>(null)
+  // 立即执行：时间范围筛选（默认近24小时）
+  const [runModalOpen, setRunModalOpen] = useState(false)
+  const [runTarget, setRunTarget] = useState<any>(null)
+  const [runRange, setRunRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
+  const [runPreset, setRunPreset] = useState('近24小时')
   const [syncingId, setSyncingId] = useState<number | null>(null)
   const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [syncTarget, setSyncTarget] = useState<any>(null)
@@ -466,7 +481,7 @@ export default function SocialAccountsPage() {
       lines.push(`## ${i + 1}. ${timeTitle || p.title || '(无时间)'}`, '')
       const meta: string[] = []
       if (p.author_name) meta.push(`作者：${p.author_name}`)
-      if (p.published_at) meta.push(`时间：${new Date(p.published_at).toLocaleString('zh-CN', { hour12: false })}`)
+      if (p.published_at) meta.push(`时间：${fmtPostTime(p.published_at)}`)
       if (p.likes) meta.push(`点赞：${p.likes}`)
       if (p.comments_count) meta.push(`评论：${p.comments_count}`)
       if (p.shares) meta.push(`转发：${p.shares}`)
@@ -519,17 +534,13 @@ export default function SocialAccountsPage() {
     return seg || ''
   }
 
-  const fmtPostTime = (iso?: string) => {
-    if (!iso) return ''
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  }
+  // published_at 为后端存储的 naive UTC，统一按北京时间展示
+  const fmtPostTime = (iso?: string) => formatBeijingTime(iso)
 
   const syncRange = (() => {
     if (!syncPosts?.length) return { earliest: '-', latest: '-' }
     const times = syncPosts.map(p => p.published_at).filter(Boolean).sort()
-    const fmt = (t: string) => t ? new Date(t).toLocaleDateString('zh-CN') : '-'
+    const fmt = (t: string) => (t ? formatBeijingDate(t) : '-')
     return {
       earliest: times.length ? fmt(times[0]) : '-',
       latest: times.length ? fmt(times[times.length - 1]) : '-',
@@ -542,11 +553,31 @@ export default function SocialAccountsPage() {
     fetchTargets()
   }
 
-  const handleRunNow = async (id: number) => {
+  // 点击「立即执行」：先弹出时间范围选择，确认后按窗口执行
+  const openRunModal = (target: any) => {
+    setRunTarget(target)
+    setRunPreset('近24小时')
+    setRunRange([dayjs().subtract(24, 'hour'), dayjs()])
+    setRunModalOpen(true)
+  }
+
+  const confirmRun = async () => {
+    if (!runTarget) return
+    if (!runRange || !runRange[0] || !runRange[1]) {
+      message.warning('请选择时间范围')
+      return
+    }
+    const [start, end] = runRange
+    if (end.isBefore(start)) {
+      message.warning('结束时间不能早于开始时间')
+      return
+    }
+    const id = runTarget.id
+    setRunModalOpen(false)
     setRunningId(id)
-    message.info('开始监测...')
+    message.info('开始监测（时间范围：' + start.format('MM-DD HH:mm') + ' ~ ' + end.format('MM-DD HH:mm') + '）...')
     try {
-      const res = await scheduleAPI.runNow(id, 'social_media')
+      const res = await scheduleAPI.runNow(id, 'social_media', start.toISOString(), end.toISOString())
       const { result_id } = res.data
 
       const pollResult = async () => {
@@ -707,7 +738,7 @@ export default function SocialAccountsPage() {
               target={target}
               running={runningId === target.id}
               syncing={syncingId === target.id}
-              onRun={() => handleRunNow(target.id)}
+              onRun={() => openRunModal(target)}
               onSync={() => openSyncModal(target)}
               onEdit={() => openEditModal(target)}
               onDelete={() => handleDelete(target.id)}
@@ -836,6 +867,63 @@ export default function SocialAccountsPage() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <Button disabled={syncingId !== null} onClick={() => setSyncModalOpen(false)}>取消</Button>
             <Button type="primary" loading={syncingId !== null} onClick={handleSync}>开始同步</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 立即执行：时间范围筛选弹窗（默认近24小时） */}
+      <Modal
+        title={runTarget ? '立即执行：' + runTarget.account_name : '立即执行'}
+        open={runModalOpen}
+        onOk={confirmRun}
+        onCancel={() => setRunModalOpen(false)}
+        okText="确认执行"
+        cancelText="取消"
+        confirmLoading={runningId === runTarget?.id}
+        width={520}
+      >
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              选择数据时间范围，仅获取该时间段内发布的贴文（默认近24小时）
+            </Text>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              {runTimePresets.map(p => (
+                <Button
+                  key={p.label}
+                  size="small"
+                  type={runPreset === p.label ? 'primary' : 'default'}
+                  onClick={() => {
+                    setRunPreset(p.label)
+                    setRunRange([dayjs().subtract(p.hours, 'hour'), dayjs()])
+                  }}
+                >
+                  {p.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              自定义范围（精确到分钟）
+            </Text>
+            <DatePicker.RangePicker
+              showTime={{ format: 'HH:mm' }}
+              format="YYYY-MM-DD HH:mm"
+              value={runRange}
+              onChange={v => {
+                setRunRange(v as [dayjs.Dayjs, dayjs.Dayjs] | null)
+                setRunPreset('')
+              }}
+              allowClear={false}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{
+            padding: '8px 12px', borderRadius: 8, fontSize: 12,
+            color: 'var(--text-muted)', background: 'var(--surface-2)',
+          }}>
+            平台无发布时间的贴文会被过滤；确认后将按此时间范围抓取并筛选贴文，完成后自动写入最新监测结果。
           </div>
         </div>
       </Modal>
