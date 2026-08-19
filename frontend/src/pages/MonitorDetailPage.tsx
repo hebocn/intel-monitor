@@ -7,6 +7,7 @@ import {
   HeartOutlined, CommentOutlined, LoadingOutlined, DownloadOutlined, ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { resultsAPI } from '../services/api'
+import { formatBeijingTime } from '../utils/time'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -31,11 +32,9 @@ function extractPostId(url: string): string {
   return seg || ''
 }
 
+// published_at 为后端存储的 naive UTC，统一按北京时间展示
 function fmtPostTime(iso?: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return formatBeijingTime(iso)
 }
 
 function downloadText(content: string, filename: string, mime: string) {
@@ -614,7 +613,7 @@ export default function MonitorDetailPage() {
                                 color: 'var(--text-muted)', fontSize: 11,
                                 fontFamily: 'var(--font-mono)',
                               }}>
-                                {post.published_at}
+                                {fmtPostTime(post.published_at)}
                               </Text>
                             )}
                             {post.likes > 0 && (
