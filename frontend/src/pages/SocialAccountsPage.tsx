@@ -1288,7 +1288,7 @@ export default function SocialAccountsPage() {
             const accounts = grouped[plat] || []
             const platInfo = platformMap[plat] || { label: '其他', color: '#666' }
             const collapsed = !!collapsedSections[plat]
-            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook'
+            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook' || plat === 'toutiao'
             const activeCount = activeCountOf(plat)
             const isDragOver = dragOverPlatform === plat && dragPlatform !== plat
             return (
