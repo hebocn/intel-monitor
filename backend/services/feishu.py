@@ -603,7 +603,36 @@ async def _set_user_push(open_id: str, enabled: bool):
 
 # ─────────────────────────── 监测结果推送 ───────────────────────────
 
-async def push_monitor_result(target_type: str, target_id: int):
+async def _build_risk_markdown(
+    latest, platform: str, account_name: str,
+    time_start=None, time_end=None,
+) -> str | None:
+    """社交账号成功结果：风险筛选 + 新格式正文。失败/无重要贴文返回 None（降级旧格式）。
+
+    发帖数量/发帖时间范围反映「任务筛选范围内的总量」：
+    数量 = 本次任务抓取的全部贴文数；时间范围 = 任务筛选窗口（无窗口时用实际数据跨度）。
+    """
+    from services.risk import (
+        analyze_monitor_posts, format_important_markdown, time_range_label,
+    )
+    try:
+        posts = json.loads(latest.raw_content or "[]")
+    except Exception:
+        posts = []
+    if not isinstance(posts, list) or not posts:
+        return None
+    analysis = await analyze_monitor_posts(posts, platform, account_name)
+    if analysis is None:
+        return None
+    important, ai_summary = analysis
+    return format_important_markdown(
+        important, ai_summary, platform, account_name,
+        total_posts=len(posts),
+        time_range_label=time_range_label(time_start, time_end, posts),
+    )
+
+
+async def push_monitor_result(target_type: str, target_id: int, time_start=None, time_end=None):
     """监测完成后推送结果到绑定飞书用户。所有失败静默降级，不影响监测主流程。"""
     if _http_client is None:
         return
@@ -636,11 +665,19 @@ async def push_monitor_result(target_type: str, target_id: int):
 
             open_id = user.feishu_open_id
             if latest.status == "success":
-                summary = (latest.summary or "（无摘要）")[:800]
+                # 社交账号：风险筛选后的新格式；无中高风险贴文/分析失败时降级旧格式
+                markdown = None
+                if target_type == "social_media":
+                    markdown = await _build_risk_markdown(
+                        latest, target.platform, target.account_name, time_start, time_end,
+                    )
+                if markdown is None:
+                    summary = (latest.summary or "（无摘要）")[:800]
+                    markdown = f"**日期**：{latest.monitor_date}  **方法**：{latest.crawl_method or '-'}\n\n{summary}"
                 card = _card(
                     "green",
                     f"✅ 监测完成 · {display}",
-                    f"**日期**：{latest.monitor_date}  **方法**：{latest.crawl_method or '-'}\n\n{summary}",
+                    markdown,
                     actions=[
                         _button("查看详情", {"action": "result", "target_id": target_id, "target_type": target_type}),
                         _button("立即监测", {"action": "run", "target_id": target_id, "target_type": target_type}),

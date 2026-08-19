@@ -86,8 +86,12 @@ class ContentSummarizer:
 
     async def _call_provider(self, provider: str, api_key: str, api_url: str, model: str,
                               parser: str, auth_style: str, system_prompt: str,
-                              user_prompt: str, images: list[str] | None = None) -> str:
-        """Call a specific AI provider and return the response text."""
+                              user_prompt: str, images: list[str] | None = None,
+                              max_tokens: int | None = None) -> str:
+        """Call a specific AI provider and return the response text.
+
+        max_tokens: 输出长度上限；None 时用提供商默认值（部分提供商默认较小会截断长输出）。
+        """
         if images:
             content = [{"type": "text", "text": user_prompt}]
             for url in images:
@@ -103,17 +107,18 @@ class ContentSummarizer:
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
         timeout = 120 if images else 60
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                user_message,
+            ],
+            "temperature": 0.7,
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(api_url, headers=headers,
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        user_message,
-                    ],
-                    "temperature": 0.7,
-                },
-            )
+            resp = await client.post(api_url, headers=headers, json=payload)
             logger.info(f"[{provider}] HTTP {resp.status_code}, 耗时 {resp.elapsed.total_seconds():.1f}s")
             resp.raise_for_status()
             data = resp.json()
@@ -151,7 +156,7 @@ class ContentSummarizer:
             return result_text
 
     async def _call_ai(self, system_prompt: str, user_prompt: str, images: list[str] | None = None,
-                       _allow_fallback: bool = True) -> str:
+                       _allow_fallback: bool = True, max_tokens: int | None = None) -> str:
         provider = settings.AI_PROVIDER
         api_key, api_url, model, parser, auth_style = self._get_provider_config(provider)
         mode = f"多模态({len(images)}张图片)" if images else "纯文本"
@@ -159,7 +164,8 @@ class ContentSummarizer:
 
         try:
             return await self._call_provider(provider, api_key, api_url, model, parser, auth_style,
-                                             system_prompt, user_prompt, images=images)
+                                             system_prompt, user_prompt, images=images,
+                                             max_tokens=max_tokens)
         except Exception as e:
             msg = str(e)
             # Content policy rejection — try fallback provider
@@ -178,7 +184,8 @@ class ContentSummarizer:
                     logger.warning(f"[{provider}] 内容安全拒绝, 降级到 {fb}")
                     try:
                         return await self._call_provider(fb, fb_api_key, fb_api_url, fb_model, fb_parser, fb_auth_style,
-                                                         system_prompt, user_prompt, images=images)
+                                                         system_prompt, user_prompt, images=images,
+                                                         max_tokens=max_tokens)
                     except Exception as fb_err:
                         last_error = str(fb_err)
                         logger.warning(f"[{fb}] 降级也失败: {fb_err}")
