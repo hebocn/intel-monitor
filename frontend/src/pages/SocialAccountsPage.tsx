@@ -1324,7 +1324,8 @@ export default function SocialAccountsPage() {
                     <HolderOutlined />
                   </span>
                   <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    minWidth: 112,
                     padding: '5px 14px 5px 10px', borderRadius: 20,
                     background: `${platInfo.color}12`, border: `1px solid ${platInfo.color}20`,
                   }}>
