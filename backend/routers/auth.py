@@ -7,6 +7,7 @@ from database import get_db
 from models.user import User
 from schemas.auth import SetupRequest, LoginRequest, TokenResponse, SetupStatusResponse, RegisterRequest, ResetPasswordRequest
 from auth import get_password_hash, verify_password, create_access_token, get_current_user
+from services.preset_tags import seed_preset_tags
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -26,6 +27,8 @@ async def initial_setup(req: SetupRequest, db: AsyncSession = Depends(get_db)):
 
     user = User(username=req.username, password_hash=get_password_hash(req.password))
     db.add(user)
+    await db.flush()
+    await seed_preset_tags(db, user.id)
     await db.commit()
 
     token = create_access_token(data={"sub": user.username})
@@ -55,6 +58,8 @@ async def register_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)
 
     user = User(username=req.username, password_hash=get_password_hash(req.password))
     db.add(user)
+    await db.flush()
+    await seed_preset_tags(db, user.id)
     await db.commit()
 
     token = create_access_token(data={"sub": user.username})

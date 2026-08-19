@@ -4,11 +4,14 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, LinkOutlined, PauseCircleOutlined,
   CheckCircleOutlined, SettingOutlined, SyncOutlined, DownloadOutlined, LoadingOutlined,
-  SearchOutlined,
+  SearchOutlined, TagsOutlined,
   UploadOutlined, FileExcelOutlined,
   HolderOutlined, PushpinOutlined, DownOutlined, RightOutlined, CloseCircleOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI, platformPrefsAPI, accountPrefsAPI } from '../services/api'
+import { targetsAPI, scheduleAPI, resultsAPI, facebookAPI, platformPrefsAPI, accountPrefsAPI, tagsAPI } from '../services/api'
+import { TagPill, type TagItem } from '../components/TagPill'
+import { TagSelectPopover } from '../components/TagSelectPopover'
+import { TagManageModal, type ManagedTag } from '../components/TagManageModal'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { formatBeijingTime, formatBeijingDate } from '../utils/time'
@@ -43,10 +46,14 @@ const runTimePresets = [
   { label: '近30天', hours: 24 * 30 },
 ]
 
+// 卡片上最多完整显示的标签数，超出折叠为 +N
+const MAX_VISIBLE_TAGS = 3
+
 function AccountCard({
   target,
   running,
   syncing,
+  allTags,
   onRun,
   onSync,
   onEdit,
@@ -54,6 +61,8 @@ function AccountCard({
   onDetail,
   onToggleActive,
   togglingActive,
+  onSetTags,
+  onCreateTag,
   onCardDragStart,
   onCardDragOver,
   onCardDrop,
@@ -66,6 +75,7 @@ function AccountCard({
   target: any
   running: boolean
   syncing: boolean
+  allTags: TagItem[]
   onRun: () => void
   onSync: () => void
   onEdit: () => void
@@ -73,6 +83,8 @@ function AccountCard({
   onDetail: () => void
   onToggleActive: (checked: boolean) => void
   togglingActive: boolean
+  onSetTags: (tagIds: number[]) => void
+  onCreateTag: (name: string, color: string) => Promise<TagItem | null>
   onCardDragStart: (e: any) => void
   onCardDragOver: (e: any) => void
   onCardDrop: (e: any) => void
@@ -82,8 +94,14 @@ function AccountCard({
   isDragOver: boolean
   idx: number
 }) {
+  const [tagsExpanded, setTagsExpanded] = useState(false)
   const plat = platformMap[target.platform] || { label: target.platform, color: '#666' }
   const imp = target.importance ? importanceMap[target.importance] : null
+
+  const targetTags: TagItem[] = target.tags || []
+  const visibleTags = tagsExpanded ? targetTags : targetTags.slice(0, MAX_VISIBLE_TAGS)
+  const hiddenCount = targetTags.length - (tagsExpanded ? 0 : Math.min(targetTags.length, MAX_VISIBLE_TAGS))
+  const selectedTagIds = targetTags.map(t => t.id)
 
   const scheduleDisplay = target.cron_schedule
     ? target.cron_schedule.split(';').filter(Boolean)
@@ -237,6 +255,72 @@ function AccountCard({
         </div>
       </div>
 
+      {/* Tags row：标签药丸（最多3个，超出 +N 展开）+ 打标签入口 */}
+      <div style={{ padding: '0 22px 12px 22px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          {visibleTags.map(tag => (
+            <TagPill key={tag.id} tag={tag} />
+          ))}
+          {hiddenCount > 0 && (
+            <span
+              onClick={() => setTagsExpanded(true)}
+              title={`还有 ${hiddenCount} 个标签`}
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '3px 10px', borderRadius: 12,
+                background: 'rgba(248,250,252,0.06)', border: '1px solid var(--border)',
+                color: 'var(--text-muted)', fontSize: 11, fontWeight: 700,
+                cursor: 'pointer', lineHeight: '16px', whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              +{hiddenCount}
+            </span>
+          )}
+          {tagsExpanded && targetTags.length > MAX_VISIBLE_TAGS && (
+            <span
+              onClick={() => setTagsExpanded(false)}
+              style={{
+                fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer',
+                textDecoration: 'underline', textUnderlineOffset: 3,
+                opacity: 0.7, padding: '0 2px',
+              }}
+            >
+              收起
+            </span>
+          )}
+          <TagSelectPopover
+            tags={allTags}
+            selectedIds={selectedTagIds}
+            onChange={onSetTags}
+            onCreateTag={onCreateTag}
+          >
+            <span
+              title="打标签"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '3px 10px', borderRadius: 12,
+                border: '1px dashed var(--border-strong)',
+                color: 'var(--text-muted)', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', lineHeight: '16px', whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-body)', transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--accent)'
+                e.currentTarget.style.color = 'var(--accent)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--border-strong)'
+                e.currentTarget.style.color = 'var(--text-muted)'
+              }}
+            >
+              <PlusOutlined style={{ fontSize: 10 }} />
+              {targetTags.length === 0 ? '标签' : ''}
+            </span>
+          </TagSelectPopover>
+        </div>
+      </div>
+
       {/* Details */}
       <div style={{ padding: '0 22px 18px 22px' }}>
         <div style={{
@@ -359,6 +443,12 @@ export default function SocialAccountsPage() {
   const [accountOrders, setAccountOrders] = useState<Record<string, number[]>>({})
   const [accountDragId, setAccountDragId] = useState<number | null>(null)
   const [accountDragOverId, setAccountDragOverId] = useState<number | null>(null)
+  // 标签
+  const [tags, setTags] = useState<ManagedTag[]>([])
+  const [tagManageOpen, setTagManageOpen] = useState(false)
+  const [filterTagIds, setFilterTagIds] = useState<number[]>([])
+  const [batchTagIds, setBatchTagIds] = useState<number[]>([])
+  const [batchTagMode, setBatchTagMode] = useState<'add' | 'remove'>('add')
 
   const handleFbSearch = async () => {
     const nickname = form.getFieldValue('account_name')
@@ -389,17 +479,24 @@ export default function SocialAccountsPage() {
     message.success('已填充账号信息，可继续设置调度')
   }
 
-  const fetchTargets = async () => {
-    setLoading(true)
+  const fetchTargets = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await targetsAPI.list()
       setTargets(res.data)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
-  useEffect(() => { fetchTargets() }, [])
+  const fetchTags = async () => {
+    try {
+      const res = await tagsAPI.list()
+      setTags(res.data)
+    } catch { /* 静默失败，不打断页面 */ }
+  }
+
+  useEffect(() => { fetchTargets(); fetchTags() }, [])
 
   // 加载平台分区自定义排序（无则默认：账号数量降序）
   useEffect(() => {
@@ -487,13 +584,17 @@ export default function SocialAccountsPage() {
 
     if (!values.importance) delete values.importance
     if (!values.avatar_url) delete values.avatar_url
+    const tagIds: number[] = values.tag_ids || []
+    delete values.tag_ids
 
     try {
       if (editingTarget) {
         await targetsAPI.update(editingTarget.id, values)
+        await targetsAPI.setTags(editingTarget.id, tagIds)
         message.success('更新成功')
       } else {
-        await targetsAPI.create(values)
+        const res = await targetsAPI.create(values)
+        if (tagIds.length > 0 && res.data?.id) await targetsAPI.setTags(res.data.id, tagIds)
         message.success('添加成功')
       }
       setModalOpen(false)
@@ -791,7 +892,7 @@ export default function SocialAccountsPage() {
 
   const openEditModal = (target: any) => {
     setEditingTarget(target)
-    form.setFieldsValue(target)
+    form.setFieldsValue({ ...target, tag_ids: (target.tags || []).map((t: any) => t.id) })
     if (target.cron_schedule) {
       setScheduleMode('cron')
       setCronExpressions(target.cron_schedule.split(';').filter(Boolean))
@@ -802,10 +903,16 @@ export default function SocialAccountsPage() {
     setModalOpen(true)
   }
 
-  // 前端本地过滤：按账号名搜索
-  const filtered = searchQuery.trim()
-    ? targets.filter((t: any) => (t.account_name || '').toLowerCase().includes(searchQuery.trim().toLowerCase()))
-    : targets
+  // 前端本地过滤：按账号名搜索 + 按标签筛选（选中的标签须全部命中）
+  const q = searchQuery.trim().toLowerCase()
+  const filtered = targets.filter((t: any) => {
+    if (q && !(t.account_name || '').toLowerCase().includes(q)) return false
+    if (filterTagIds.length > 0) {
+      const ids = (t.tags || []).map((tg: any) => tg.id)
+      if (!filterTagIds.every(id => ids.includes(id))) return false
+    }
+    return true
+  })
 
   // ── 平台分区 ─────────────────────────────────────────────
   const grouped = (() => {
@@ -918,6 +1025,39 @@ export default function SocialAccountsPage() {
     }
   }
 
+  // ── 标签 ────────────────────────────────────────────────
+  // 卡片打标签：乐观更新，失败回滚
+  const handleSetTargetTags = async (target: any, tagIds: number[]) => {
+    const prevTags = target.tags
+    const nextTags = tags.filter(t => tagIds.includes(t.id))
+    setTargets(prev => prev.map(t => (t.id === target.id ? { ...t, tags: nextTags } : t)))
+    try {
+      await targetsAPI.setTags(target.id, tagIds)
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '标签设置失败')
+      setTargets(prev => prev.map(t => (t.id === target.id ? { ...t, tags: prevTags } : t)))
+    }
+  }
+
+  // 就地新建标签（选择器内），成功后加入标签库
+  const handleCreateTag = async (name: string, color: string): Promise<TagItem | null> => {
+    try {
+      const res = await tagsAPI.create({ name, color })
+      const tag = res.data
+      setTags(prev => [...prev, tag])
+      return tag
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '标签创建失败')
+      return null
+    }
+  }
+
+  // 标签库变更（改名/换色/删除）后：静默刷新标签与账号（卡片上药丸同步）
+  const handleTagsChanged = () => {
+    fetchTags()
+    fetchTargets(true)
+  }
+
   // ── 分区内账号排序(拖拽/置顶) ──────────────────────────────
   const persistAccountOrder = async (platform: string, ids: number[]) => {
     setAccountOrders(prev => ({ ...prev, [platform]: ids }))
@@ -978,18 +1118,33 @@ export default function SocialAccountsPage() {
     const payload: any = { target_ids: filtered.map((t: any) => t.id) }
     if (batchActive !== 'keep') payload.is_active = batchActive === 'on'
     if (batchPush !== 'keep') payload.push_enabled = batchPush === 'on'
-    if (payload.is_active === undefined && payload.push_enabled === undefined) {
-      message.warning('请至少选择一项要修改的开关')
+    const hasSwitch = payload.is_active !== undefined || payload.push_enabled !== undefined
+    const hasTags = batchTagIds.length > 0
+    if (!hasSwitch && !hasTags) {
+      message.warning('请至少选择一项要修改的开关或标签')
       return
     }
     setBatchSaving(true)
     try {
-      const res = await targetsAPI.batchUpdate(payload)
-      message.success(`已批量更新 ${res.data.updated} 个账号`)
+      let updated = 0
+      if (hasSwitch) {
+        const res = await targetsAPI.batchUpdate(payload)
+        updated = res.data.updated
+      }
+      if (hasTags) {
+        await targetsAPI.batchTags({
+          target_ids: payload.target_ids,
+          ...(batchTagMode === 'add' ? { add_tag_ids: batchTagIds } : { remove_tag_ids: batchTagIds }),
+        })
+        updated = payload.target_ids.length
+      }
+      message.success(`已批量更新 ${updated} 个账号`)
       setBatchOpen(false)
       setBatchActive('keep')
       setBatchPush('keep')
-      fetchTargets()
+      setBatchTagIds([])
+      setBatchTagMode('add')
+      fetchTargets(true)
     } catch (e: any) {
       message.error(e?.response?.data?.detail || '批量更新失败')
     } finally {
@@ -1007,6 +1162,14 @@ export default function SocialAccountsPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <Button
+            icon={<TagsOutlined />}
+            onClick={() => setTagManageOpen(true)}
+            className="animate-fade-in-up"
+            style={{ animationDelay: '0.04s' }}
+          >
+            标签管理
+          </Button>
           <Button
             icon={<SettingOutlined />}
             onClick={() => setBatchOpen(true)}
@@ -1036,8 +1199,8 @@ export default function SocialAccountsPage() {
         </div>
       </div>
 
-      {/* 搜索框：按账号名定位 */}
-      <div className="animate-fade-in-up" style={{ marginBottom: 16, animationDelay: '0.12s' }}>
+      {/* 筛选栏：账号名搜索 + 按标签筛选 */}
+      <div className="animate-fade-in-up" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, animationDelay: '0.12s' }}>
         <Input
           allowClear
           prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
@@ -1046,12 +1209,48 @@ export default function SocialAccountsPage() {
           onChange={e => setSearchQuery(e.target.value)}
           style={{ maxWidth: 420, borderRadius: 10 }}
         />
+        <Select
+          className="tag-filter-select"
+          mode="multiple"
+          allowClear
+          placeholder="按标签筛选"
+          value={filterTagIds.length ? filterTagIds : undefined}
+          onChange={setFilterTagIds}
+          maxTagCount="responsive"
+          style={{ minWidth: 200, maxWidth: 360, borderRadius: 10, marginLeft: 'auto' }}
+          suffixIcon={<TagsOutlined style={{ color: 'var(--text-muted)' }} />}
+          options={tags.map(t => ({ value: t.id, label: t.name }))}
+          optionRender={option => {
+            const t = tags.find(x => x.id === option.value)
+            return (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: t?.color || '#94A3B8', flexShrink: 0 }} />
+                <span>{option.label}</span>
+              </span>
+            )
+          }}
+          tagRender={props => {
+            const t = tags.find(x => x.id === props.value)
+            if (!t) return <span>{props.label}</span>
+            return (
+              <TagPill
+                tag={t}
+                closable
+                onClose={e => { e.stopPropagation(); props.onClose(e) }}
+                onClick={e => e.stopPropagation()}
+              />
+            )
+          }}
+        />
       </div>
 
       {/* Account cards */}
       {filtered.length === 0 && targets.length > 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-          未找到匹配「{searchQuery}」的账号
+          未找到匹配{[
+            searchQuery.trim() && `「${searchQuery.trim()}」`,
+            filterTagIds.length > 0 && '所选标签',
+          ].filter(Boolean).join(' + ') || '当前条件'}的账号
         </div>
       ) : null}
       {loading ? (
@@ -1089,7 +1288,7 @@ export default function SocialAccountsPage() {
             const accounts = grouped[plat] || []
             const platInfo = platformMap[plat] || { label: '其他', color: '#666' }
             const collapsed = !!collapsedSections[plat]
-            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook'
+            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook' || plat === 'toutiao'
             const activeCount = activeCountOf(plat)
             const isDragOver = dragOverPlatform === plat && dragPlatform !== plat
             return (
@@ -1125,7 +1324,8 @@ export default function SocialAccountsPage() {
                     <HolderOutlined />
                   </span>
                   <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    minWidth: 112,
                     padding: '5px 14px 5px 10px', borderRadius: 20,
                     background: `${platInfo.color}12`, border: `1px solid ${platInfo.color}20`,
                   }}>
@@ -1168,8 +1368,11 @@ export default function SocialAccountsPage() {
                         target={target}
                         running={runningId === target.id}
                         syncing={syncingId === target.id}
+                        allTags={tags}
                         togglingActive={togglingIds.includes(target.id)}
                         onToggleActive={(checked: boolean) => handleToggleActive(target, checked)}
+                        onSetTags={(tagIds: number[]) => handleSetTargetTags(target, tagIds)}
+                        onCreateTag={handleCreateTag}
                         onCardDragStart={(e: any) => handleAccountDragStart(e, target)}
                         onCardDragOver={(e: any) => handleAccountDragOver(e, target)}
                         onCardDrop={(e: any) => handleAccountDrop(e, target)}
@@ -1193,6 +1396,14 @@ export default function SocialAccountsPage() {
         </div>
       )}
 
+      {/* 标签管理弹窗 */}
+      <TagManageModal
+        open={tagManageOpen}
+        onClose={() => setTagManageOpen(false)}
+        tags={tags}
+        onChanged={handleTagsChanged}
+      />
+
       {/* 批量设置弹窗：作用于当前筛选结果 */}
       <Modal
         title={`批量设置（${filtered.length} 个账号）`}
@@ -1200,8 +1411,8 @@ export default function SocialAccountsPage() {
         onOk={handleBatchUpdate}
         okText="应用"
         confirmLoading={batchSaving}
-        onCancel={() => { setBatchOpen(false); setBatchActive('keep'); setBatchPush('keep') }}
-        width={460}
+        onCancel={() => { setBatchOpen(false); setBatchActive('keep'); setBatchPush('keep'); setBatchTagIds([]); setBatchTagMode('add') }}
+        width={500}
       >
         <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Text type="secondary" style={{ fontSize: 13 }}>
@@ -1230,6 +1441,40 @@ export default function SocialAccountsPage() {
                 { value: 'keep', label: '保持不变' },
                 { value: 'on', label: '开启' },
                 { value: 'off', label: '关闭' },
+              ]}
+            />
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <Text style={{ fontSize: 14, fontWeight: 600, display: 'block', marginBottom: 10 }}>
+              标签
+            </Text>
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="选择标签（可选）"
+              value={batchTagIds.length ? batchTagIds : undefined}
+              onChange={setBatchTagIds}
+              maxTagCount="responsive"
+              style={{ width: '100%' }}
+              options={tags.map(t => ({ value: t.id, label: t.name }))}
+              optionRender={option => {
+                const t = tags.find(x => x.id === option.value)
+                return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: t?.color || '#94A3B8', flexShrink: 0 }} />
+                    <span>{option.label}</span>
+                  </span>
+                )
+              }}
+            />
+            <Segmented
+              block
+              value={batchTagMode}
+              onChange={v => setBatchTagMode(v as 'add' | 'remove')}
+              style={{ marginTop: 10 }}
+              options={[
+                { value: 'add', label: '添加到所选账号' },
+                { value: 'remove', label: '从所选账号移除' },
               ]}
             />
           </div>
@@ -1610,6 +1855,35 @@ export default function SocialAccountsPage() {
           </Form.Item>
           <Form.Item name="importance" label="重要性">
             <Select options={importanceOptions} placeholder="选择重要性" allowClear />
+          </Form.Item>
+          <Form.Item name="tag_ids" label="标签">
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="选择标签（可多选）"
+              options={tags.map(t => ({ value: t.id, label: t.name }))}
+              optionRender={option => {
+                const t = tags.find(x => x.id === option.value)
+                return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: t?.color || '#94A3B8', flexShrink: 0 }} />
+                    <span>{option.label}</span>
+                  </span>
+                )
+              }}
+              tagRender={props => {
+                const t = tags.find(x => x.id === props.value)
+                if (!t) return <span>{props.label}</span>
+                return (
+                  <TagPill
+                    tag={t}
+                    closable
+                    onClose={e => { e.stopPropagation(); props.onClose(e) }}
+                    onClick={e => e.stopPropagation()}
+                  />
+                )
+              }}
+            />
           </Form.Item>
           <Form.Item label="调度模式">
             <Select
