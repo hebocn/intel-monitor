@@ -172,7 +172,7 @@ async def _monitor_social_target(db: AsyncSession, target: Target, time_start=No
         )
         monitor_result.status = "success"
         await db.commit()
-        await push_monitor_result("social_media", target.id)
+        await push_monitor_result("social_media", target.id, time_start, time_end)
         logger.info(f"[{target.account_name}] === 监控完成 (结果ID: {monitor_result.id}) ===")
 
     except Exception as e:
