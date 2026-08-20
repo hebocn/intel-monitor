@@ -33,35 +33,21 @@ function WebsiteCard({
 }) {
   return (
     <div
-      className={`animate-fade-in-up delay-${Math.min(idx + 1, 6)}`}
-      style={{
-        background: 'var(--surface-0, #fff)',
-        borderRadius: 16,
-        border: '1px solid var(--border)',
-        overflow: 'hidden',
-        transition: 'all 0.2s ease',
-        position: 'relative',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.06)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = 'none'
-        e.currentTarget.style.transform = 'translateY(0)'
+        style={{
+          background: 'transparent',
+          borderRadius: 0,
+          border: 'none',
+          borderBottom: '1px solid var(--border)',
+          overflow: 'visible',
+          transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
+          position: 'relative',
       }}
     >
-      {/* Left accent bar */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-        background: `linear-gradient(180deg, ${siteColor}, ${siteColor}88)`,
-        borderRadius: '4px 0 0 4px',
-      }} />
 
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '18px 22px 14px 22px',
+          padding: '16px 0 10px 0',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Website icon badge */}
@@ -123,7 +109,7 @@ function WebsiteCard({
       </div>
 
       {/* Details */}
-      <div style={{ padding: '0 22px 18px 22px' }}>
+        <div style={{ padding: '0 0 18px 0' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 20,
           flexWrap: 'wrap',
@@ -353,7 +339,7 @@ export default function WebsitesPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
         <div>
           <h1 className="page-title animate-fade-in-up">网站监测管理</h1>
-          <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <div className="page-subtitle">
             WEBSITE TARGETS · {websites.length} 个目标
           </div>
         </div>
@@ -362,16 +348,12 @@ export default function WebsitesPage() {
             icon={<SettingOutlined />}
             onClick={() => setBatchOpen(true)}
             disabled={websites.length === 0}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.06s' }}
           >
             批量设置
           </Button>
           <Button
             icon={<UploadOutlined />}
             onClick={() => setImportOpen(true)}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.08s' }}
           >
             批量导入
           </Button>
@@ -379,8 +361,6 @@ export default function WebsitesPage() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true) }}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.1s' }}
           >
             添加网站
           </Button>
@@ -388,15 +368,15 @@ export default function WebsitesPage() {
       </div>
 
       {/* 搜索框：按网站名定位 */}
-      <div className="animate-fade-in-up" style={{ marginBottom: 16, animationDelay: '0.12s' }}>
-        <Input
-          allowClear
-          prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
-          placeholder="搜索网站名称，定位到指定网站..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          style={{ maxWidth: 420, borderRadius: 10 }}
-        />
+      <div style={{ marginBottom: 16, }}>          <Input
+            className="page-search-input"
+            allowClear
+            prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
+            placeholder="搜索网站名称，定位到指定网站..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ width: 'min(420px, 100%)', borderRadius: 10 }}
+          />
       </div>
 
       {/* Website cards */}

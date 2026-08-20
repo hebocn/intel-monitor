@@ -131,13 +131,6 @@ export default function AppLayout({ children, onLogout }: Props) {
           transition: 'width 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        {/* 顶部渐变 */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 200,
-          background: 'linear-gradient(180deg, rgba(34,197,94,0.08) 0%, transparent 100%)',
-          pointerEvents: 'none',
-        }} />
-
         {/* Logo 区域 */}
         <div style={{
           flexShrink: 0,
@@ -145,8 +138,6 @@ export default function AppLayout({ children, onLogout }: Props) {
           display: 'flex', alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'flex-start',
           gap: collapsed ? 0 : 16,
-          borderBottom: '1px solid transparent',
-          borderImage: 'linear-gradient(to right, rgba(34,197,94,0.15), transparent) 1',
           position: 'relative',
         }}>
           {collapsed ? (
@@ -179,7 +170,7 @@ export default function AppLayout({ children, onLogout }: Props) {
                   情报监测
                 </Text>
                 <Text style={{
-                  color: 'rgba(255,255,255,0.35)', fontSize: 11, letterSpacing: 3,
+                  color: 'var(--text-muted)', fontSize: 11, letterSpacing: 3,
                   fontFamily: "var(--font-mono)", fontWeight: 500,
                 }}>
                   INTEL · MONITOR
@@ -205,6 +196,11 @@ export default function AppLayout({ children, onLogout }: Props) {
                 <Tooltip key={item.key} title={item.label} placement="right" mouseEnterDelay={0.3}>
                   <div
                     className={`sidebar-nav-collapsed-item${isActive ? ' active' : ''}`}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.key) } }}
                     onClick={() => navigate(item.key)}
                   >
                     <span className="sidebar-nav-icon" style={{
@@ -221,6 +217,11 @@ export default function AppLayout({ children, onLogout }: Props) {
               <div
                 key={item.key}
                 className={`sidebar-nav-item${isActive ? ' active' : ''}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.key) } }}
                 onClick={() => navigate(item.key)}
               >
                 <span className="sidebar-nav-icon" style={{
@@ -253,17 +254,17 @@ export default function AppLayout({ children, onLogout }: Props) {
               paddingTop: 14,
               display: 'flex', flexDirection: 'column', gap: 6,
             }}>
-              <div className="sidebar-dashboard-card" style={{ animationDelay: '0s' }}>
+              <div className="sidebar-dashboard-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div className="sidebar-status-dot" />
-                  <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+                  <Text style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
                     监控运行中
                   </Text>
                 </div>
               </div>
-              <div className="sidebar-dashboard-card" style={{ animationDelay: '0.05s' }}>
+              <div className="sidebar-dashboard-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'var(--font-body)', letterSpacing: 1 }}>
+                  <Text style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-body)', letterSpacing: 1 }}>
                     今日任务
                   </Text>
                   <Text style={{
@@ -274,9 +275,9 @@ export default function AppLayout({ children, onLogout }: Props) {
                   </Text>
                 </div>
               </div>
-              <div className="sidebar-dashboard-card" style={{ animationDelay: '0.1s' }}>
+              <div className="sidebar-dashboard-card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'var(--font-body)', letterSpacing: 1 }}>
+                  <Text style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-body)', letterSpacing: 1 }}>
                     AI 引擎
                   </Text>
                   <Text style={{
@@ -293,6 +294,11 @@ export default function AppLayout({ children, onLogout }: Props) {
           {/* 折叠按钮 */}
           <div
             className="sidebar-collapse-btn"
+              tabIndex={0}
+              role="button"
+              aria-label={collapsed ? '展开侧边栏' : '折叠侧边栏'}
+              aria-expanded={!collapsed}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(prev => !prev) } }}
             onClick={() => setCollapsed(prev => !prev)}
           >
             {collapsed ? <RightOutlined /> : <LeftOutlined />}

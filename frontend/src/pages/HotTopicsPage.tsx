@@ -82,8 +82,6 @@ const glassItem: React.CSSProperties = {
 const glassItemHover: React.CSSProperties = {
   background: 'rgba(248,250,252,0.06)',
   border: '1px solid rgba(248,250,252,0.12)',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-  transform: 'translateY(-1px)',
 }
 
 const glassChip: React.CSSProperties = {
@@ -116,7 +114,7 @@ function TopicRow({ topic, idx, color, onDelete }: { topic: Topic; idx: number; 
         gap: 14,
         padding: '12px 16px',
         cursor: topic.url ? 'pointer' : 'default',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -130,8 +128,6 @@ function TopicRow({ topic, idx, color, onDelete }: { topic: Topic; idx: number; 
         e.currentTarget.style.background = glassItem.background as string
         e.currentTarget.style.border = glassItem.border as string
         e.currentTarget.style.borderTop = glassItem.borderTop as string
-        e.currentTarget.style.boxShadow = glassItem.boxShadow as string
-        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
       {/* Rank badge */}
@@ -645,34 +641,9 @@ export default function HotTopicsPage() {
         position: 'fixed', inset: 0,
         background: `url("${NOISE_SVG}")`,
         pointerEvents: 'none', zIndex: 0,
-        opacity: 0.4,
+        opacity: 0.15,
       }} />
 
-      {/* Decorative ambient glows */}
-      <div style={{
-        position: 'fixed', top: -180, right: -120, width: 800, height: 800,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(96,165,250,0.12) 0%, rgba(167,139,250,0.04) 35%, transparent 65%)',
-        filter: 'blur(120px)', pointerEvents: 'none', zIndex: 0,
-      }} />
-      <div style={{
-        position: 'fixed', bottom: -220, left: -100, width: 700, height: 700,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(245,158,11,0.08) 0%, rgba(217,119,6,0.03) 35%, transparent 65%)',
-        filter: 'blur(100px)', pointerEvents: 'none', zIndex: 0,
-      }} />
-      <div style={{
-        position: 'fixed', top: '35%', left: '15%', width: 500, height: 500,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 60%)',
-        filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
-      }} />
-      <div style={{
-        position: 'fixed', top: '55%', right: '10%', width: 400, height: 400,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(15,118,110,0.06) 0%, transparent 55%)',
-        filter: 'blur(70px)', pointerEvents: 'none', zIndex: 0,
-      }} />
 
       <div style={{ position: 'relative', zIndex: 1 }}>
         {/* Header */}
@@ -685,8 +656,7 @@ export default function HotTopicsPage() {
             }}>
               热门话题
             </h1>
-            <div className="page-subtitle animate-fade-in-up" style={{
-              animationDelay: '0.05s',
+            <div className="page-subtitle" style={{
               color: 'var(--text-secondary)',
               letterSpacing: 1.5,
             }}>
@@ -699,9 +669,7 @@ export default function HotTopicsPage() {
                 icon={<SyncOutlined spin={fetchingId === 'all'} />}
                 onClick={handleFetchAll}
                 loading={fetchingId === 'all'}
-                className="animate-fade-in-up"
                 style={{
-                  animationDelay: '0.08s',
                   ...glassChip,
                   height: 38, fontWeight: 600,
                   color: ACCENT_GREEN,
@@ -714,13 +682,10 @@ export default function HotTopicsPage() {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => { form.resetFields(); setModalOpen(true) }}
-              className="animate-fade-in-up"
               style={{
-                animationDelay: '0.1s',
                 borderRadius: 24, height: 38, fontWeight: 600,
-                background: 'linear-gradient(135deg, #22C55E, #16A34A)',
+                  background: 'var(--accent)',
                 border: 'none',
-                boxShadow: '0 4px 20px rgba(34,197,94,0.30)',
               }}
             >
               添加平台
@@ -769,7 +734,7 @@ export default function HotTopicsPage() {
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '9px 18px',
                   cursor: 'pointer',
-                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                   background: activePlatform === 'all'
                     ? 'rgba(96,165,250,0.12)' : glassChip.background,
                   border: activePlatform === 'all'
@@ -807,7 +772,7 @@ export default function HotTopicsPage() {
                       display: 'flex', alignItems: 'center', gap: 8,
                       padding: '9px 16px',
                       cursor: 'pointer',
-                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                       background: isActive ? hexToRgba(pColor, 0.10) : glassChip.background,
                       border: isActive ? `1px solid ${hexToRgba(pColor, 0.28)}` : glassChip.border,
                       borderTop: isActive ? `1px solid ${hexToRgba(pColor, 0.28)}` : glassChip.borderTop,
@@ -842,7 +807,7 @@ export default function HotTopicsPage() {
 
                     {/* Action buttons */}
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: 1,
+                      display: 'flex', alignItems: 'center', gap: 8,
                       marginLeft: 4,
                       borderLeft: '1px solid rgba(248,250,252,0.06)',
                       paddingLeft: 6,

@@ -89,24 +89,10 @@ function ResultCard({ record, onDelete }: { record: any; onDelete: (id: number) 
       borderRadius: 16,
       border: '1px solid var(--border)',
       overflow: 'hidden',
-      transition: 'all 0.2s ease',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
       position: 'relative',
     }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.06)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = 'none'
-        e.currentTarget.style.transform = 'translateY(0)'
-      }}
     >
-      {/* Left accent bar */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-        background: `linear-gradient(180deg, ${pColor}, ${pColor}88)`,
-        borderRadius: '4px 0 0 4px',
-      }} />
 
       {/* Header */}
       <div style={{
@@ -175,7 +161,7 @@ function ResultCard({ record, onDelete }: { record: any; onDelete: (id: number) 
 
           {/* Delete */}
           <Popconfirm title="确定删除此记录？" onConfirm={() => onDelete(record.id)} okButtonProps={{ danger: true }}>
-            <DeleteOutlined style={{ color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', opacity: 0.4 }}
+            <DeleteOutlined style={{ color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', opacity: 0.7 }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
             />
@@ -462,14 +448,14 @@ export default function DashboardPage() {
     <div>
       <div style={{ marginBottom: 32 }}>
         <h1 className="page-title animate-fade-in-up">仪表盘</h1>
-        <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>OVERVIEW · 实时监测概览</div>
+        <div className="page-subtitle">OVERVIEW · 实时监测概览</div>
       </div>
 
       {/* Stat cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
         {statCards.map((card, idx) => (
           <Col span={4} key={card.key}>
-            <div className={`stat-card animate-fade-in-up delay-${idx + 1}`} style={{
+            <div className="stat-card" style={{
               background: '#ffffff',
               border: '1px solid var(--border)',
               borderRadius: 14,
@@ -517,7 +503,7 @@ export default function DashboardPage() {
       </Row>
 
       {/* Monitoring results */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+      <div>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 20,

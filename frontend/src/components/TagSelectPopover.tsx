@@ -63,7 +63,7 @@ export function TagSelectPopover({
               cursor: 'pointer',
               background: selected ? `${tag.color}10` : 'transparent',
               border: `1px solid ${selected ? `${tag.color}26` : 'transparent'}`,
-              transition: 'all 0.15s ease',
+              transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
             }}
             onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(248,250,252,0.04)' }}
             onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}

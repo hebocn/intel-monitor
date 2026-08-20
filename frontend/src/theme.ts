@@ -3,12 +3,14 @@ import type { ThemeConfig } from 'antd'
 const theme: ThemeConfig = {
   token: {
     colorPrimary: '#22C55E',
+    colorPrimaryActive: '#16A34A',
     colorBgContainer: '#1A2332',
     colorBgElevated: '#111827',
     colorBgLayout: '#050B14',
     colorText: '#F8FAFC',
     colorTextSecondary: '#CBD5E1',
     colorTextTertiary: '#94A3B8',
+    colorTextQuaternary: '#8494A8',
     colorBorder: 'rgba(248,250,252,0.08)',
     colorBorderSecondary: 'rgba(248,250,252,0.06)',
     colorSuccess: '#22C55E',

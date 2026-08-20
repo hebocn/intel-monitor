@@ -3,9 +3,14 @@
   --font-body: 'Inter', 'Noto Sans SC', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --accent: #22C55E;
+  --accent-strong: #16A34A;
   --accent-light: rgba(34,197,94,0.12);
   --accent-glow: rgba(34,197,94,0.2);
   --bg: #050B14;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #60A5FA;
   --surface-0: #0B1120;
   --surface-1: #111827;
   --surface-2: #1A2332;
@@ -13,6 +18,7 @@
   --text-primary: #F8FAFC;
   --text-secondary: #CBD5E1;
   --text-muted: #94A3B8;
+  --text-dim: #8494A8;
   --border: rgba(248,250,252,0.08);
   --border-strong: rgba(248,250,252,0.14);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
@@ -26,6 +32,10 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
 body {
   background: var(--bg);
   color: var(--text-primary);
@@ -103,13 +113,6 @@ body {
 .animate-scale-in {
   animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.delay-1 { animation-delay: 0.04s; }
-.delay-2 { animation-delay: 0.08s; }
-.delay-3 { animation-delay: 0.12s; }
-.delay-4 { animation-delay: 0.16s; }
-.delay-5 { animation-delay: 0.2s; }
-.delay-6 { animation-delay: 0.24s; }
-
 /* ===== Reduced motion ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -296,7 +299,7 @@ body {
   border-radius: 10px !important;
   font-size: 15px !important;
   height: 44px !important;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 .ant-btn:active {
   transform: scale(0.98) !important;
@@ -312,21 +315,17 @@ body {
   background: var(--accent-light) !important;
 }
 .ant-btn-primary {
-  background: linear-gradient(135deg, #0f766e, #115e59) !important;
-  border-color: #0f766e !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
   color: #ffffff !important;
   font-weight: 700 !important;
-  box-shadow: 0 2px 12px rgba(34,197,94,0.25) !important;
 }
 .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #0d9488, #0f766e) !important;
-  border-color: #40916c !important;
-  box-shadow: 0 6px 24px rgba(34,197,94,0.3) !important;
-  transform: translateY(-1px) !important;
+  background: var(--accent-strong) !important;
+  border-color: var(--accent-strong) !important;
 }
 .ant-btn-primary:active {
-  transform: translateY(0) scale(0.98) !important;
-  box-shadow: 0 2px 8px rgba(15,118,110,0.2) !important;
+  transform: scale(0.98) !important;
 }
 .ant-btn-dangerous {
   border-color: rgba(199,80,80,0.25) !important;
@@ -376,20 +375,11 @@ body {
 }
 
 /* ===== Sidebar Animations ===== */
-@keyframes sidebarPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-  50% { box-shadow: 0 0 12px 4px rgba(34,197,94,0.3); }
-}
-@keyframes sidebarDashSlide {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 .sidebar-status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #22C55E;
-  animation: sidebarPulse 2s ease-in-out infinite;
   flex-shrink: 0;
 }
 .sidebar-nav-item {
@@ -400,7 +390,7 @@ body {
   border-radius: 12px;
   background: rgba(255,255,255,0.04);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   overflow: hidden;
   user-select: none;
@@ -438,7 +428,7 @@ body {
 .sidebar-nav-icon {
   font-size: 20px;
   color: rgba(248,250,252,0.55);
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
 .sidebar-nav-label {
@@ -459,7 +449,7 @@ body {
   justify-content: center;
   background: rgba(255,255,255,0.04);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   user-select: none;
 }
@@ -500,7 +490,7 @@ body {
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.08);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   color: rgba(255,255,255,0.4);
   font-size: 14px;
 }
@@ -511,13 +501,24 @@ body {
 .sidebar-collapse-btn:active {
   transform: scale(0.92);
 }
+
+.sidebar-nav-item:focus-visible,
+.sidebar-nav-collapsed-item:focus-visible,
+.sidebar-collapse-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+div[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .sidebar-dashboard-card {
   padding: 12px;
   background: rgba(255,255,255,0.03);
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.04);
   margin-bottom: 6px;
-  animation: sidebarDashSlide 0.3s ease both;
 }
 .sidebar-dashboard-card:last-child {
   margin-bottom: 0;
@@ -533,7 +534,7 @@ body {
   font-size: 15px !important;
   height: 46px !important;
   line-height: 46px !important;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 .ant-menu-dark .ant-menu-item-selected {
   background: rgba(255,255,255,0.12) !important;
@@ -594,7 +595,7 @@ body {
   border-color: var(--border) !important;
   font-family: var(--font-body) !important;
   border-radius: 8px !important;
-  transition: all 0.2s ease !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
 }
 .ant-pagination-item a {
   color: var(--text-muted) !important;
@@ -613,6 +614,17 @@ body {
   border-color: var(--border) !important;
   color: var(--text-muted) !important;
   border-radius: 8px !important;
+}
+
+.ant-pagination-item,
+.ant-pagination-prev,
+.ant-pagination-next,
+.ant-pagination-jump-prev,
+.ant-pagination-jump-next {
+  margin-inline-end: 10px !important;
+}
+.ant-pagination-total-text {
+  margin-inline-end: 12px !important;
 }
 
 /* ===== Switch ===== */
@@ -715,7 +727,6 @@ button, a, .ant-menu-item, .ant-select-item, .ant-btn, .ant-table-row {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 .stat-card:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md) !important;
 }
 
@@ -752,6 +763,32 @@ button, a, .ant-menu-item, .ant-select-item, .ant-btn, .ant-table-row {
 /* ===== Tag filter select — 与搜索框等高（44px）且内容垂直居中 ===== */
 .tag-filter-select .ant-select-selector {
   min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* ===== Unified filter bar — equal height, equal radius, one rhythm ===== */
+.social-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.social-filter-bar .ant-input-affix-wrapper,
+.social-filter-bar .ant-select-selector {
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* ===== Page search input — same height and width rhythm across pages ===== */
+.page-search-input .ant-input-affix-wrapper {
+  height: 44px !important;
   display: flex !important;
   align-items: center !important;
 }

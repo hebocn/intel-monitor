@@ -137,14 +137,13 @@ function ResultCard({
 
   return (
     <div
-      className={`animate-fade-in-up delay-${Math.min(idx + 1, 6)}`}
       onClick={onClick}
       style={{
         background: selected ? 'rgba(15,118,110,0.04)' : 'var(--surface-0, #fff)',
         borderRadius: 14,
         border: selected ? '2px solid rgba(15,118,110,0.3)' : '1px solid var(--border)',
         overflow: 'hidden',
-        transition: 'all 0.2s ease',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
         position: 'relative',
         cursor: 'pointer',
       }}
@@ -209,7 +208,7 @@ function ResultCard({
           >
             <DeleteOutlined
               onClick={e => e.stopPropagation()}
-              style={{ color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', opacity: 0.4 }}
+              style={{ color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', opacity: 0.7 }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '0.4')}
             />
@@ -402,13 +401,13 @@ export default function MonitorDetailPage() {
           </Button>
           <h1 className="page-title animate-fade-in-up" style={{ margin: 0 }}>监测详情</h1>
         </div>
-        <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+        <div className="page-subtitle">
           {type === 'social_media' ? 'SOCIAL' : 'WEBSITE'} · TARGET #{id}
         </div>
       </div>
 
       {/* Results list */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.1s', marginBottom: 24 }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 16,
@@ -485,7 +484,7 @@ export default function MonitorDetailPage() {
 
       {/* Detail panel */}
       {selectedResult && (
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+        <div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             marginBottom: 20,
