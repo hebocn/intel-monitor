@@ -21,9 +21,9 @@
   --cockpit-danger:      #EF4444;
 
   --cockpit-text-primary:   #F1F5F9;
-  --cockpit-text-secondary: #94A3B8;
-  --cockpit-text-muted:     #64748B;
-  --cockpit-text-dim:       #475569;
+  --cockpit-text-secondary: #CBD5E1;
+  --cockpit-text-muted:     #94A3B8;
+  --cockpit-text-dim:       #8494A8;
 }
 
 /* ── 全局重置 ── */
@@ -38,36 +38,7 @@
 .cockpit-root * { box-sizing: border-box; }
 
 /* ── 背景层 ── */
-.cockpit-bg-grid {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.04;
-  background-image:
-    linear-gradient(rgba(34,197,94,0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34,197,94,0.3) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
 
-.cockpit-ambient {
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(120px);
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.08;
-}
-.cockpit-ambient--top {
-  top: -200px; right: -150px;
-  width: 600px; height: 600px;
-  background: var(--cockpit-accent);
-}
-.cockpit-ambient--bottom {
-  bottom: -250px; left: -180px;
-  width: 700px; height: 700px;
-  background: var(--cockpit-cyan);
-}
 
 /* ── 顶部栏 ── */
 .cockpit-topbar {
@@ -87,12 +58,12 @@
   background: linear-gradient(90deg, var(--cockpit-accent), transparent);
 }
 .cockpit-topbar__title {
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 3px;
   color: var(--cockpit-text-primary);
-  text-shadow: 0 0 30px var(--cockpit-accent-glow);
+
   line-height: 1.2;
 }
 .cockpit-topbar__meta {
@@ -110,11 +81,13 @@
   letter-spacing: 1.5px;
 }
 .cockpit-topbar__status-dot {
+  box-shadow: 0 0 6px var(--cockpit-accent-glow);
+  animation: cockpit-pulse 2s ease-in-out infinite;
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--cockpit-accent);
-  box-shadow: 0 0 10px var(--cockpit-accent-glow);
-  animation: cockpit-pulse 2s ease-in-out infinite;
+
+
 }
 .cockpit-topbar__clock {
   font-family: var(--font-mono);
@@ -124,8 +97,8 @@
 }
 
 @keyframes cockpit-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--cockpit-accent-glow); }
-  50% { opacity: 0.5; box-shadow: 0 0 20px var(--cockpit-accent-glow); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* ── Section header ── */
@@ -134,12 +107,11 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 3px;
   color: var(--cockpit-accent);
-  text-transform: uppercase;
 }
 .cockpit-section-header__line {
   flex: 1; height: 1px;
@@ -152,7 +124,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 2px;
   color: var(--cockpit-text-muted);
@@ -173,13 +145,10 @@
   padding: 22px 20px;
   position: relative;
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: default;
-  animation: cockpit-fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .cockpit-kpi:hover {
-  border-color: rgba(34,197,94,0.18);
-  transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(34,197,94,0.06);
 }
 .cockpit-kpi::before {
@@ -221,12 +190,11 @@
 }
 
 .cockpit-kpi__label {
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--cockpit-text-muted);
-  text-transform: uppercase;
 }
 
 .cockpit-kpi__icon {
@@ -251,7 +219,7 @@
   position: relative;
   z-index: 1;
 }
-.cockpit-kpi--green  .cockpit-kpi__value { color: var(--cockpit-accent); text-shadow: 0 0 16px rgba(34,197,94,0.2); }
+.cockpit-kpi--green  .cockpit-kpi__value { color: var(--cockpit-accent);  }
 .cockpit-kpi--amber  .cockpit-kpi__value { color: var(--cockpit-amber); }
 .cockpit-kpi--cyan   .cockpit-kpi__value { color: var(--cockpit-cyan); }
 .cockpit-kpi--rose   .cockpit-kpi__value { color: var(--cockpit-rose); }
@@ -299,19 +267,18 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 2.5px;
   color: var(--cockpit-text-secondary);
-  text-transform: uppercase;
 }
 
 .cockpit-panel__title-dot {
   width: 6px; height: 6px;
   border-radius: 2px;
   background: var(--cockpit-accent);
-  box-shadow: 0 0 6px var(--cockpit-accent-glow);
+
 }
 
 .cockpit-panel__badge {
@@ -348,26 +315,15 @@
   border-radius: 12px;
   border: 1px solid var(--cockpit-border);
   background: rgba(15,23,42,0.35);
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   cursor: default;
   position: relative;
   overflow: hidden;
 }
-.cockpit-platform-item::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 80% 20%, rgba(34,197,94,0.04), transparent 60%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
 .cockpit-platform-item:hover {
   border-color: rgba(34,197,94,0.18);
   background: var(--cockpit-bg-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(34,197,94,0.04);
 }
-.cockpit-platform-item:hover::after { opacity: 1; }
 
 .cockpit-platform-item__dot {
   width: 12px; height: 12px;
@@ -386,16 +342,14 @@
 .cockpit-platform-item:hover .cockpit-platform-item__dot-ring { opacity: 0.5; }
 .cockpit-platform-item__dot--online {
   background: var(--cockpit-accent);
-  box-shadow: 0 0 10px var(--cockpit-accent-glow);
-  animation: cockpit-pulse 2s ease-in-out infinite;
+
+
 }
 .cockpit-platform-item__dot--online .cockpit-platform-item__dot-ring {
   border-color: var(--cockpit-accent);
-  animation: cockpit-ring-expand 2s ease-out infinite;
 }
 .cockpit-platform-item__dot--degraded {
   background: var(--cockpit-amber);
-  box-shadow: 0 0 8px rgba(245,158,11,0.3);
 }
 .cockpit-platform-item__dot--degraded .cockpit-platform-item__dot-ring {
   border-color: var(--cockpit-amber);
@@ -404,10 +358,6 @@
   background: var(--cockpit-danger);
 }
 
-@keyframes cockpit-ring-expand {
-  0% { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(2.2); opacity: 0; }
-}
 
 .cockpit-platform-item__info { min-width: 0; flex: 1; }
 .cockpit-platform-item__name {
@@ -488,7 +438,7 @@
   gap: 1px;
 }
 .cockpit-platform-summary__value {
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 18px;
   font-weight: 800;
   color: var(--cockpit-text-primary);
@@ -499,7 +449,6 @@
   font-size: 8px;
   color: var(--cockpit-text-muted);
   letter-spacing: 1.2px;
-  text-transform: uppercase;
 }
 .cockpit-platform-summary__divider {
   width: 1px;
@@ -524,8 +473,6 @@
   max-height: none;
   overflow-y: visible;
 }
-  text-transform: uppercase;
-}
 .cockpit-platform-summary__divider {
   width: 1px;
   height: 32px;
@@ -546,8 +493,8 @@
   width: 7px; height: 7px;
   border-radius: 50%;
   background: var(--cockpit-accent);
-  box-shadow: 0 0 8px var(--cockpit-accent-glow);
-  animation: cockpit-pulse 1.5s ease-in-out infinite;
+
+
 }
 .cockpit-platform-live-indicator__label {
   font-family: var(--font-mono);
@@ -595,7 +542,7 @@
   border: 1px solid rgba(34,197,94,0.07);
   border-radius: 10px;
   margin-bottom: 8px;
-  transition: all 0.25s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
 .cockpit-task-bar:hover {
   border-color: rgba(34,197,94,0.12);
@@ -606,8 +553,8 @@
   width: 10px; height: 10px;
   border-radius: 3px;
   background: var(--cockpit-accent);
-  box-shadow: 0 0 10px var(--cockpit-accent-glow);
-  animation: cockpit-pulse 2s ease-in-out infinite;
+
+
   flex-shrink: 0;
 }
 
@@ -645,17 +592,8 @@
   padding: 8px 0 4px;
   position: relative;
 }
-.cockpit-donut__glow {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 160px; height: 160px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(34,197,94,0.06), transparent 70%);
-  pointer-events: none;
-}
 .cockpit-donut__svg {
-  filter: drop-shadow(0 0 16px rgba(34,197,94,0.08));
+
 }
 .cockpit-donut__slice {
   transition: opacity 0.3s ease;
@@ -778,13 +716,16 @@
   border-radius: 10px;
   border: 1px solid transparent;
   background: rgba(15,23,42,0.25);
-  transition: all 0.25s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
   cursor: pointer;
-  animation: cockpit-fadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .cockpit-feed-item:hover {
   border-color: var(--cockpit-border);
   background: var(--cockpit-bg-hover);
+}
+.cockpit-feed-item:focus-visible {
+  outline: 2px solid var(--cockpit-accent);
+  outline-offset: 2px;
 }
 
 .cockpit-feed-item__timeline {
@@ -851,13 +792,14 @@
   color: var(--cockpit-text-dim);
   letter-spacing: 1px;
   margin-left: auto;
-  opacity: 0;
+  opacity: 0.55;
   transition: opacity 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.cockpit-feed-item:hover .cockpit-feed-item__expand-hint {
-  opacity: 0.7;
+.cockpit-feed-item:hover .cockpit-feed-item__expand-hint,
+.cockpit-feed-item:focus-visible .cockpit-feed-item__expand-hint {
+  opacity: 0.9;
 }
 
 /* ── 展开态 ── */
@@ -887,12 +829,11 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--cockpit-accent);
-  text-transform: uppercase;
 }
 
 .cockpit-feed-detail__ai-body {
@@ -912,12 +853,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--cockpit-text-muted);
-  text-transform: uppercase;
 }
 
 .cockpit-feed-detail__badge {
@@ -1105,11 +1045,6 @@
 }
 
 /* ── 动画 ── */
-@keyframes cockpit-fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 /* ── 响应式 ── */
 @media (max-width: 1200px) {
   .cockpit-kpi-grid { grid-template-columns: repeat(3, 1fr); }
@@ -1146,7 +1081,7 @@
   border: 1px solid transparent;
   background: rgba(15,23,42,0.25);
   text-decoration: none;
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1), color 0.25s cubic-bezier(0.22, 1, 0.36, 1), transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cockpit-hot-item:hover {
   border-color: var(--cockpit-border);
@@ -1156,7 +1091,7 @@
 .cockpit-hot-item__rank {
   width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 16px; font-weight: 800;
   flex-shrink: 0;
   border-radius: 6px;
@@ -1213,7 +1148,7 @@
 }
 .cockpit-health-item__dot--on {
   background: var(--cockpit-accent);
-  box-shadow: 0 0 8px var(--cockpit-accent-glow);
+
 }
 .cockpit-health-item__dot--off {
   background: var(--cockpit-text-dim);
@@ -1263,7 +1198,7 @@
   border: 1px solid rgba(255,255,255,0.04);
 }
 .cockpit-stat-mini__value {
-  font-family: 'Orbitron', var(--font-display), sans-serif;
+  font-family: var(--font-mono);
   font-size: 18px; font-weight: 700;
   color: var(--cockpit-text-primary);
   letter-spacing: 1px;
@@ -1273,7 +1208,6 @@
   font-size: 9px;
   color: var(--cockpit-text-dim);
   letter-spacing: 1px;
-  text-transform: uppercase;
 }
 
 /* ── 进度提示 ── */
@@ -1295,5 +1229,5 @@
   width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--cockpit-purple);
-  animation: cockpit-pulse 2s ease-in-out infinite;
+
 }

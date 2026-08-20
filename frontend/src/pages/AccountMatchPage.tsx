@@ -298,7 +298,7 @@ export default function AccountMatchPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 className="page-title animate-fade-in-up">账号比对</h1>
-          <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <div className="page-subtitle">
             ACCOUNT MATCH · 跨平台身份关联 · AI 画像分析
           </div>
         </div>
@@ -335,10 +335,19 @@ export default function AccountMatchPage() {
                 ]} />
             </Col>
           )}
-          <Col xs={24} md={matchMode === 'profile' ? 10 : 14}>
-            <Input.Search size="large" placeholder={getPlaceholder()} value={targetName}
-              onChange={e => setTargetName(e.target.value)} onSearch={handleSearch} loading={searching}
-              enterButton={<span><SwapOutlined /> 开始比对</span>} style={{ borderRadius: 10 }} />
+          <Col xs={24} md={matchMode === 'profile' ? 10 : 14}>              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Input
+                  size="large"
+                  placeholder={getPlaceholder()}
+                  value={targetName}
+                  onChange={e => setTargetName(e.target.value)}
+                  onPressEnter={handleSearch}
+                  style={{ flex: 1, borderRadius: 10 }}
+                />
+                <Button type="primary" size="large" icon={<SwapOutlined />} loading={searching} onClick={handleSearch}>
+                  开始比对
+                </Button>
+              </div>
           </Col>
           <Col xs={24} md={6}>
             <div style={{ display: 'flex', gap: 8, height: 40 }}>
@@ -357,7 +366,7 @@ export default function AccountMatchPage() {
                       border: `2px solid ${checked ? '#22C55E' : 'rgba(248,250,252,0.1)'}`,
                       background: checked ? 'rgba(34,197,94,0.12)' : 'rgba(248,250,252,0.03)',
                       color: checked ? '#22C55E' : 'var(--text-muted)',
-                      transition: 'all 0.2s',
+                      transition: 'background-color 0.2s ease, border-color 0.2s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}>
                     {p.label}
@@ -388,11 +397,15 @@ export default function AccountMatchPage() {
                   const modeLabel = t.match_mode === 'profile' ? '🔗' : '🔍'
                   return (
                     <div key={t.id} onClick={() => { stopPolling(); fetchTaskDetail(t.id) }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={active}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stopPolling(); fetchTaskDetail(t.id) } }}
                       style={{
                         padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
                         background: active ? '#0C1929' : 'transparent',
                         border: active ? '1px solid #1E3A5F' : '1px solid transparent',
-                        transition: 'all 0.15s',
+                        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                       }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>

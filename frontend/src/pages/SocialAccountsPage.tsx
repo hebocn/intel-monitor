@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, Drawer, Segmented, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert, DatePicker } from 'antd'
+import { Button, Modal, Drawer, Segmented, Form, Input, Select, InputNumber, Switch, Tag, message, Popconfirm, Typography, Tooltip, Skeleton, Upload, Alert, DatePicker, Table } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   ClockCircleOutlined, LinkOutlined, PauseCircleOutlined,
@@ -20,13 +20,13 @@ const { Text } = Typography
 
 const platformOptions = [
   { value: 'x', label: 'X (Twitter)', color: '#1DA1F2' },
+  { value: 'facebook', label: 'Facebook', color: '#1877F2' },
   { value: 'youtube', label: 'YouTube', color: '#FF0000' },
+  { value: 'weibo', label: '微博', color: '#E6162D' },
   { value: 'xiaohongshu', label: '小红书', color: '#FE2C55' },
   { value: 'douyin', label: '抖音', color: '#000000' },
-  { value: 'weibo', label: '微博', color: '#E6162D' },
   { value: 'toutiao', label: '今日头条', color: '#E53333' },
   { value: '108community', label: '108社区', color: '#2563EB' },
-  { value: 'facebook', label: 'Facebook', color: '#1877F2' },
 ]
 
 const importanceOptions = [
@@ -110,38 +110,24 @@ function AccountCard({
   return (
     <div
       data-account-id={target.id}
-      className={`animate-fade-in-up delay-${Math.min(idx + 1, 6)}`}
       style={{
-        background: 'var(--surface-0, #fff)',
-        borderRadius: 16,
-        border: isDragOver ? '1px dashed ' + plat.color : '1px solid var(--border)',
-        overflow: 'hidden',
-        opacity: target.is_active ? 1 : 0.6,
-        transition: 'all 0.2s ease',
-        position: 'relative',
-      }}
+          background: 'transparent',
+          borderRadius: 0,
+          border: 'none',
+          borderBottom: isDragOver ? `1px dashed ${plat.color}` : '1px solid var(--border)',
+          overflow: 'visible',
+          opacity: target.is_active ? 1 : 0.6,
+          transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
+          position: 'relative',
+        }}
       onDragOver={onCardDragOver}
       onDrop={onCardDrop}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.06)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = 'none'
-        e.currentTarget.style.transform = 'translateY(0)'
-      }}
     >
-      {/* Left accent bar */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-        background: `linear-gradient(180deg, ${plat.color}, ${plat.color}88)`,
-        borderRadius: '4px 0 0 4px',
-      }} />
 
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '18px 22px 14px 22px',
+          padding: '14px 0 10px 0',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* 拖拽手柄(分区内排序) */}
@@ -303,7 +289,7 @@ function AccountCard({
                 border: '1px dashed var(--border-strong)',
                 color: 'var(--text-muted)', fontSize: 11, fontWeight: 600,
                 cursor: 'pointer', lineHeight: '16px', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-body)', transition: 'all 0.2s ease',
+                fontFamily: 'var(--font-body)', transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = 'var(--accent)'
@@ -322,7 +308,7 @@ function AccountCard({
       </div>
 
       {/* Details */}
-      <div style={{ padding: '0 22px 18px 22px' }}>
+        <div style={{ padding: '0 0 18px 0' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 20,
           flexWrap: 'wrap',
@@ -447,6 +433,7 @@ export default function SocialAccountsPage() {
   const [tags, setTags] = useState<ManagedTag[]>([])
   const [tagManageOpen, setTagManageOpen] = useState(false)
   const [filterTagIds, setFilterTagIds] = useState<number[]>([])
+  const [filterPlatform, setFilterPlatform] = useState<string | undefined>(undefined)
   const [batchTagIds, setBatchTagIds] = useState<number[]>([])
   const [batchTagMode, setBatchTagMode] = useState<'add' | 'remove'>('add')
 
@@ -906,6 +893,7 @@ export default function SocialAccountsPage() {
   // 前端本地过滤：按账号名搜索 + 按标签筛选（选中的标签须全部命中）
   const q = searchQuery.trim().toLowerCase()
   const filtered = targets.filter((t: any) => {
+    if (filterPlatform && t.platform !== filterPlatform) return false
     if (q && !(t.account_name || '').toLowerCase().includes(q)) return false
     if (filterTagIds.length > 0) {
       const ids = (t.tags || []).map((tg: any) => tg.id)
@@ -1152,12 +1140,227 @@ export default function SocialAccountsPage() {
     }
   }
 
+  const tableData = sectionPlatforms.flatMap((platform: string) => {
+    const accounts = grouped[platform] || []
+    return orderedAccountsFor(platform, accounts).map((target: any, idx: number) => ({
+      ...target,
+      _platform: platform,
+      _index: idx,
+    }))
+  })
+
+  const columns: any[] = [
+    {
+      title: '',
+      key: 'drag',
+      width: 44,
+      render: (_: any, record: any) => (
+        <span
+          draggable
+          title="拖拽排序（同平台内）"
+          onDragStart={(e: any) => handleAccountDragStart(e, record)}
+          onDragOver={(e: any) => handleAccountDragOver(e, record)}
+          onDrop={(e: any) => handleAccountDrop(e, record)}
+          onDragEnd={handleAccountDragEnd}
+          style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
+        >
+          <HolderOutlined />
+        </span>
+      ),
+    },
+    {
+      title: '平台',
+      key: 'platform',
+      width: 150,
+      render: (_: any, record: any) => {
+        const plat = platformMap[record.platform] || { label: record.platform, color: '#666' }
+        return (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 10px', borderRadius: 20,
+              background: `${plat.color}12`, border: `1px solid ${plat.color}20`,
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: plat.color, display: 'inline-block' }} />
+              <Text style={{ color: plat.color, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{plat.label}</Text>
+            </span>
+          </div>
+        )
+      },
+    },
+    {
+      title: '账号',
+      key: 'account',
+      render: (_: any, record: any) => (
+        <Text strong style={{ fontSize: 14, display: 'block', minWidth: 160 }}>{record.account_name}</Text>
+      ),
+    },
+    {
+      title: '重要性',
+      key: 'importance',
+      width: 96,
+      render: (_: any, record: any) => {
+        const imp = record.importance ? importanceMap[record.importance] : null
+        return imp ? (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '3px 10px', borderRadius: 10,
+            background: `${imp.color}10`, border: `1px solid ${imp.color}18`,
+            color: imp.color, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+          }}>
+            {imp.label}
+          </span>
+        ) : <Text type="secondary">—</Text>
+      },
+    },
+    {
+      title: '链接',
+      key: 'url',
+      width: 220,
+      render: (_: any, record: any) => record.account_url ? (
+        <a
+          href={record.account_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--text-secondary)', fontSize: 13, textDecoration: 'none',
+            fontFamily: 'var(--font-mono)', display: 'inline-block', maxWidth: 200,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {record.account_url}
+        </a>
+      ) : <Text type="secondary">—</Text>,
+    },
+    {
+      title: '标签',
+      key: 'tags',
+      width: 260,
+      render: (_: any, record: any) => {
+        const targetTags: TagItem[] = record.tags || []
+        const visibleTags = targetTags.slice(0, MAX_VISIBLE_TAGS)
+        const hiddenCount = targetTags.length - visibleTags.length
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+            {visibleTags.map((tag: TagItem) => <TagPill key={tag.id} tag={tag} />)}
+            {hiddenCount > 0 && (
+              <Tooltip title={targetTags.slice(MAX_VISIBLE_TAGS).map((t: TagItem) => t.name).join('、')}>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 10, fontSize: 11,
+                  background: 'var(--surface-1)', border: '1px solid var(--border)',
+                  color: 'var(--text-muted)', cursor: 'default',
+                }}>+{hiddenCount}</span>
+              </Tooltip>
+            )}
+            <TagSelectPopover
+              tags={tags}
+              selectedIds={targetTags.map((t: TagItem) => t.id)}
+              onChange={(tagIds: number[]) => handleSetTargetTags(record, tagIds)}
+              onCreateTag={handleCreateTag}
+            >
+              <span
+                title="打标签"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 10,
+                  border: '1px dashed var(--border-strong)', color: 'var(--text-muted)',
+                  fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                <PlusOutlined style={{ fontSize: 10 }} />
+                {targetTags.length === 0 ? '标签' : ''}
+              </span>
+            </TagSelectPopover>
+          </div>
+        )
+      },
+    },
+    {
+      title: '调度',
+      key: 'schedule',
+      width: 170,
+      render: (_: any, record: any) => {
+        const scheduleDisplay = record.cron_schedule
+          ? record.cron_schedule.split(';').filter(Boolean)
+          : null
+        return scheduleDisplay ? (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {scheduleDisplay.map((e: string, i: number) => (
+              <Tag key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, margin: 0 }}>
+                {e}
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <Text style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+            {String(record.monitor_hour).padStart(2, '0')}:{String(record.monitor_minute).padStart(2, '0')}
+          </Text>
+        )
+      },
+    },
+    {
+      title: '状态',
+      key: 'status',
+      width: 110,
+      render: (_: any, record: any) => (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Switch size="small" checked={record.is_active} loading={togglingIds.includes(record.id)} onChange={(checked: boolean) => handleToggleActive(record, checked)} />
+          <Text style={{ fontSize: 12, color: record.is_active ? 'var(--accent)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {record.is_active ? '启用' : '停用'}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 240,
+      render: (_: any, record: any) => {
+        const accounts = orderedAccountsFor(record._platform, grouped[record._platform] || [])
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Tooltip title="置顶该账号（同平台内）">
+              <Button
+                type="text"
+                size="small"
+                icon={<PushpinOutlined />}
+                disabled={accounts[0]?.id === record.id}
+                onClick={() => pinAccount(record)}
+                style={{ color: '#0f766e' }}
+              />
+            </Tooltip>
+            <Tooltip title="立即执行">
+              <Button type="text" size="small" icon={<PlayCircleOutlined />} loading={runningId === record.id} onClick={() => openRunModal(record)} style={{ color: '#0f766e' }} />
+            </Tooltip>
+            {['x', 'weibo', 'facebook'].includes(record.platform) && (
+              <Tooltip title="同步（拉取正文存档）">
+                <Button type="text" size="small" icon={<SyncOutlined />} loading={syncingId === record.id} onClick={() => openSyncModal(record)} style={{ color: '#3370ff' }} />
+              </Tooltip>
+            )}
+            <Tooltip title="编辑">
+              <Button type="text" size="small" icon={<EditOutlined />} onClick={() => openEditModal(record)} />
+            </Tooltip>
+            <Tooltip title="查看详情">
+              <Button type="text" size="small" icon={<SettingOutlined />} onClick={() => navigate('/detail/social_media/' + record.id)} />
+            </Tooltip>
+            <Popconfirm title="确定删除此账号？" onConfirm={() => handleDelete(record.id)} okButtonProps={{ danger: true }}>
+              <Tooltip title="删除">
+                <Button type="text" size="small" icon={<DeleteOutlined />} style={{ color: '#c75050' }} />
+              </Tooltip>
+            </Popconfirm>
+          </div>
+        )
+      },
+    },
+  ]
+
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
         <div>
           <h1 className="page-title animate-fade-in-up">社交账号管理</h1>
-          <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <div className="page-subtitle">
             SOCIAL ACCOUNTS · {targets.length} 个目标
           </div>
         </div>
@@ -1165,8 +1368,6 @@ export default function SocialAccountsPage() {
           <Button
             icon={<TagsOutlined />}
             onClick={() => setTagManageOpen(true)}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.04s' }}
           >
             标签管理
           </Button>
@@ -1174,16 +1375,12 @@ export default function SocialAccountsPage() {
             icon={<SettingOutlined />}
             onClick={() => setBatchOpen(true)}
             disabled={targets.length === 0}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.06s' }}
           >
             批量设置
           </Button>
           <Button
             icon={<UploadOutlined />}
             onClick={() => setImportOpen(true)}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.08s' }}
           >
             批量导入
           </Button>
@@ -1191,212 +1388,96 @@ export default function SocialAccountsPage() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => { setEditingTarget(null); form.resetFields(); setScheduleMode('simple'); setCronExpressions(['']); setModalOpen(true) }}
-            className="animate-fade-in-up"
-            style={{ animationDelay: '0.1s' }}
           >
             添加账号
           </Button>
         </div>
       </div>
 
-      {/* 筛选栏：账号名搜索 + 按标签筛选 */}
-      <div className="animate-fade-in-up" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, animationDelay: '0.12s' }}>
-        <Input
-          allowClear
-          prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
-          placeholder="搜索账号名称，定位到指定账号..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          style={{ maxWidth: 420, borderRadius: 10 }}
-        />
-        <Select
-          className="tag-filter-select"
-          mode="multiple"
-          allowClear
-          placeholder="按标签筛选"
-          value={filterTagIds.length ? filterTagIds : undefined}
-          onChange={setFilterTagIds}
-          maxTagCount="responsive"
-          style={{ minWidth: 200, maxWidth: 360, borderRadius: 10, marginLeft: 'auto' }}
-          suffixIcon={<TagsOutlined style={{ color: 'var(--text-muted)' }} />}
-          options={tags.map(t => ({ value: t.id, label: t.name }))}
-          optionRender={option => {
-            const t = tags.find(x => x.id === option.value)
-            return (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: t?.color || '#94A3B8', flexShrink: 0 }} />
-                <span>{option.label}</span>
-              </span>
-            )
-          }}
-          tagRender={props => {
-            const t = tags.find(x => x.id === props.value)
-            if (!t) return <span>{props.label}</span>
-            return (
-              <TagPill
-                tag={t}
-                closable
-                onClose={e => { e.stopPropagation(); props.onClose(e) }}
-                onClick={e => e.stopPropagation()}
-              />
-            )
-          }}
-        />
-      </div>
+        {/* 统一筛选栏：搜索 + 平台 + 标签，同一高度同一节奏 */}
+        <div className="social-filter-bar">
+          <Input
+            className="page-search-input"
+            allowClear
+            prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
+            placeholder="搜索账号名称"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ width: 'min(420px, 100%)', borderRadius: 10 }}
+          />
+          <Select
+            size="large"
+            allowClear
+            placeholder="全部平台"
+            value={filterPlatform}
+            onChange={setFilterPlatform}
+            style={{ width: 180, borderRadius: 10 }}
+            options={platformOptions.map(p => ({ value: p.value, label: p.label }))}
+            optionRender={option => {
+              const p = platformOptions.find(x => x.value === option.value)
+              return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: p?.color || '#94A3B8', flexShrink: 0 }} />
+                  <span>{option.label}</span>
+                </span>
+              )
+            }}
+          />
+          <Select
+            className="tag-filter-select"
+            mode="multiple"
+            size="large"
+            allowClear
+            placeholder="标签筛选"
+            value={filterTagIds.length ? filterTagIds : undefined}
+            onChange={setFilterTagIds}
+            maxTagCount="responsive"
+            style={{ width: 280, borderRadius: 10 }}
+            suffixIcon={<TagsOutlined style={{ color: 'var(--text-muted)' }} />}
+            options={tags.map(t => ({ value: t.id, label: t.name }))}
+            optionRender={option => {
+              const t = tags.find(x => x.id === option.value)
+              return (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: t?.color || '#94A3B8', flexShrink: 0 }} />
+                  <span>{option.label}</span>
+                </span>
+              )
+            }}
+            tagRender={props => {
+              const t = tags.find(x => x.id === props.value)
+              if (!t) return <span>{props.label}</span>
+              return (
+                <TagPill
+                  tag={t}
+                  closable
+                  onClose={e => { e.stopPropagation(); props.onClose(e) }}
+                  onClick={e => e.stopPropagation()}
+                />
+              )
+            }}
+          />
+        </div>
 
-      {/* Account cards */}
-      {filtered.length === 0 && targets.length > 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-          未找到匹配{[
-            searchQuery.trim() && `「${searchQuery.trim()}」`,
-            filterTagIds.length > 0 && '所选标签',
-          ].filter(Boolean).join(' + ') || '当前条件'}的账号
+              {/* Account table */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <Button size="small" type="text" icon={<VerticalAlignTopOutlined />} loading={orderSaving} onClick={resetOrder}>
+            恢复默认平台排序
+          </Button>
         </div>
-      ) : null}
-      {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{
-              background: 'var(--surface-2)', borderRadius: 16, border: '1px solid var(--border)', padding: '22px',
-            }}>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                <Skeleton.Input active style={{ width: 80, height: 26, borderRadius: 12 }} />
-                <Skeleton.Input active style={{ width: 50, height: 22, borderRadius: 10 }} />
-                <Skeleton.Input active style={{ width: 140, height: 22, borderRadius: 4 }} />
-              </div>
-              <Skeleton.Input active style={{ width: '70%', height: 16, borderRadius: 4 }} />
-            </div>
-          ))}
-        </div>
-      ) : targets.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '80px 0',
-          color: 'var(--text-muted)', fontSize: 14,
-        }}>
-          暂无社交账号，点击"添加账号"开始监控
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {platformOrder && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -4 }}>
-              <Button size="small" type="text" icon={<VerticalAlignTopOutlined />} loading={orderSaving} onClick={resetOrder}>
-                恢复默认排序
-              </Button>
-            </div>
-          )}
-          {sectionPlatforms.map(plat => {
-            const accounts = grouped[plat] || []
-            const platInfo = platformMap[plat] || { label: '其他', color: '#666' }
-            const collapsed = !!collapsedSections[plat]
-            const canRunNow = plat === 'x' || plat === 'weibo' || plat === 'facebook' || plat === 'toutiao'
-            const activeCount = activeCountOf(plat)
-            const isDragOver = dragOverPlatform === plat && dragPlatform !== plat
-            return (
-              <div key={plat} className="animate-fade-in-up" style={{
-                background: 'var(--surface-0, #fff)',
-                borderRadius: 16,
-                border: isDragOver ? `1px dashed ${platInfo.color}` : '1px solid var(--border)',
-                overflow: 'hidden',
-                transition: 'border-color 0.2s ease',
-              }}>
-                {/* 分区标题栏：拖拽排序 / 置顶 / 全部立即执行 / 折叠 */}
-                <div
-                  onClick={() => toggleCollapse(plat)}
-                  onDragOver={e => { if (dragPlatform && dragPlatform !== plat) { e.preventDefault(); setDragOverPlatform(plat) } }}
-                  onDragLeave={() => setDragOverPlatform(null)}
-                  onDrop={e => handleDropOnSection(e, plat)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '14px 20px',
-                    cursor: 'pointer',
-                    background: 'var(--surface-1)',
-                    userSelect: 'none',
-                  }}
-                >
-                  <span
-                    draggable
-                    onDragStart={e => handleDragStart(e, plat)}
-                    onDragEnd={() => { setDragPlatform(null); setDragOverPlatform(null) }}
-                    onClick={e => e.stopPropagation()}
-                    title="拖拽排序"
-                    style={{ cursor: 'grab', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    <HolderOutlined />
-                  </span>
-                  <div style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    minWidth: 112,
-                    padding: '5px 14px 5px 10px', borderRadius: 20,
-                    background: `${platInfo.color}12`, border: `1px solid ${platInfo.color}20`,
-                  }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: platInfo.color }} />
-                    <Text style={{ color: platInfo.color, fontSize: 12, fontWeight: 700 }}>{platInfo.label}</Text>
-                  </div>
-                  <Text style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15, flex: 1 }}>
-                    {accounts.length} 个账号
-                  </Text>
-                  <Tooltip title="置顶该平台">
-                    <Button
-                      type="text" size="small"
-                      icon={<PushpinOutlined />}
-                      disabled={sectionPlatforms.indexOf(plat) === 0}
-                      onClick={e => { e.stopPropagation(); pinPlatform(plat) }}
-                      style={{ color: '#0f766e' }}
-                    />
-                  </Tooltip>
-                  {canRunNow && (
-                    <Tooltip title={'全部立即执行（' + activeCount + ' 个启用账号）'}>
-                      <Button
-                        type="text" size="small"
-                        icon={<PlayCircleOutlined />}
-                        disabled={activeCount === 0}
-                        loading={accounts.some((t: any) => batchRunStatuses[t.id] === 'running')}
-                        onClick={e => { e.stopPropagation(); openBatchRunModal(plat) }}
-                        style={{ color: '#3370ff' }}
-                      >
-                        全部立即执行
-                      </Button>
-                    </Tooltip>
-                  )}
-                  {collapsed ? <RightOutlined style={{ color: 'var(--text-muted)' }} /> : <DownOutlined style={{ color: 'var(--text-muted)' }} />}
-                </div>
-                {!collapsed && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 18 }}>
-                    {orderedAccountsFor(plat, accounts).map((target: any, idx: number) => (
-                      <AccountCard
-                        key={target.id}
-                        target={target}
-                        running={runningId === target.id}
-                        syncing={syncingId === target.id}
-                        allTags={tags}
-                        togglingActive={togglingIds.includes(target.id)}
-                        onToggleActive={(checked: boolean) => handleToggleActive(target, checked)}
-                        onSetTags={(tagIds: number[]) => handleSetTargetTags(target, tagIds)}
-                        onCreateTag={handleCreateTag}
-                        onCardDragStart={(e: any) => handleAccountDragStart(e, target)}
-                        onCardDragOver={(e: any) => handleAccountDragOver(e, target)}
-                        onCardDrop={(e: any) => handleAccountDrop(e, target)}
-                        onCardDragEnd={handleAccountDragEnd}
-                        onPin={() => pinAccount(target)}
-                        pinDisabled={orderedAccountsFor(plat, accounts)[0]?.id === target.id}
-                        isDragOver={accountDragOverId === target.id && accountDragId !== target.id}
-                        onRun={() => openRunModal(target)}
-                        onSync={() => openSyncModal(target)}
-                        onEdit={() => openEditModal(target)}
-                        onDelete={() => handleDelete(target.id)}
-                        onDetail={() => navigate('/detail/social_media/' + target.id)}
-                        idx={idx}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={tableData}
+          loading={loading}
+          size="middle"
+          scroll={{ x: 1380 }}
+          pagination={{ pageSize: 20, showSizeChanger: false, showTotal: (total: number) => `共计 ${total} 个账号` }}
+          onRow={(record: any) => ({ style: { opacity: record.is_active ? 1 : 0.65 } })}
+          locale={{ emptyText: targets.length === 0 ? '暂无社交账号，点击"添加账号"开始监控' : '未找到匹配当前筛选条件的账号' }}
+        />
 
-      {/* 标签管理弹窗 */}
+{/* 标签管理弹窗 */}
       <TagManageModal
         open={tagManageOpen}
         onClose={() => setTagManageOpen(false)}

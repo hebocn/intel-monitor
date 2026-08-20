@@ -142,6 +142,10 @@ function PostComments({ commentsJson }: { commentsJson: string | null }) {
     return (
       <div style={{ marginBottom: 8 }}>
         <div onClick={() => setOpen(!open)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={open}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(!open) } }}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', borderRadius: 18,
@@ -149,7 +153,7 @@ function PostComments({ commentsJson }: { commentsJson: string | null }) {
             border: `1px solid ${open ? '#93c5fd' : '#1E293B'}`,
             fontSize: 12, color: open ? '#3B82F6' : 'var(--text-muted)',
             cursor: 'pointer', userSelect: 'none',
-            fontWeight: 500, transition: 'all 0.15s',
+            fontWeight: 500, transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
           }}>
           <MessageOutlined />热门评论 <span style={{ fontWeight: 700, color: '#60A5FA' }}>{cmts.length}</span> 条
           {open ? ' ▲' : ' ▼'}
@@ -284,7 +288,7 @@ function DeepAnalysisButton({ post }: { post: SentimentPost }) {
           color: statusStyle.color, fontSize: 13, fontWeight: 600,
           cursor: (status === 'idle' || status === 'failed') && !loading ? 'pointer' : 'default',
           opacity: loading || status === 'processing' ? 0.8 : 1,
-          transition: 'all 0.15s',
+          transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
         }}
       >
         {loading && <SyncOutlined spin />}
@@ -441,7 +445,7 @@ export default function SentimentPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 className="page-title animate-fade-in-up">舆情搜索</h1>
-          <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <div className="page-subtitle">
             SENTIMENT · 跨平台关键词监测 · 影响力智能排序
           </div>
         </div>
@@ -451,10 +455,19 @@ export default function SentimentPage() {
       {/* Search Bar */}
       <div style={{ background: 'var(--surface-2)', borderRadius: R.xl, padding: '24px 28px', marginBottom: 24, border: '1px solid #1E293B', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         <Row gutter={[12, 12]}>
-          <Col xs={24} md={12}>
-            <Input.Search size="large" placeholder="输入关键词，如：人工智能、贸易政策..." value={keyword} onChange={e => setKeyword(e.target.value)}
-              onSearch={handleSearch} loading={searching}
-              enterButton={<span><SearchOutlined /> 开始搜索</span>} style={{ borderRadius: 10 }} />
+          <Col xs={24} md={12}>              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Input
+                  size="large"
+                  placeholder="输入关键词，如：人工智能、贸易政策..."
+                  value={keyword}
+                  onChange={e => setKeyword(e.target.value)}
+                  onPressEnter={handleSearch}
+                  style={{ flex: 1, borderRadius: 10 }}
+                />
+                <Button type="primary" size="large" icon={<SearchOutlined />} loading={searching} onClick={handleSearch}>
+                  开始搜索
+                </Button>
+              </div>
           </Col>
           <Col xs={24} md={8}>
             <Select mode="multiple" size="large" style={{ width: '100%', borderRadius: 10 }} placeholder="选择平台" value={selectedPlatforms} onChange={setSelectedPlatforms}
@@ -476,7 +489,7 @@ export default function SentimentPage() {
                   border: `1.5px solid ${checked ? '#22C55E' : 'rgba(248,250,252,0.1)'}`,
                   background: checked ? 'rgba(34,197,94,0.12)' : 'rgba(248,250,252,0.03)',
                   color: checked ? '#22C55E' : 'var(--text-muted)',
-                  transition: 'all 0.2s ease',
+                  transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
                 }}>
                 {p.label}
               </Tag.CheckableTag>
@@ -561,11 +574,15 @@ export default function SentimentPage() {
                   const active = selectedTask?.id === t.id
                   return (
                     <div key={t.id} onClick={() => { stopPolling(); fetchTaskDetail(t.id) }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={active}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stopPolling(); fetchTaskDetail(t.id) } }}
                       style={{
                         padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
                         background: active ? '#0C1929' : 'transparent',
                         border: active ? '1px solid #1E3A5F' : '1px solid transparent',
-                        transition: 'all 0.15s',
+                        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
                       }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{t.keyword}</span>

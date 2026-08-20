@@ -100,7 +100,6 @@ function KpiCard({ def, value, delay }: { def: KpiDef; value: number; delay: num
   return (
     <div
       className={`cockpit-kpi cockpit-kpi--${v}`}
-      style={{ animationDelay: `${delay * 0.06}s` }}
     >
       <div className="cockpit-kpi__accent" />
       <div className="cockpit-kpi__header">
@@ -281,7 +280,7 @@ function PlatformDonut({ items }: { items: { label: string; color: string; value
         </defs>
         <text x={CX} y={CY - 2} textAnchor="middle"
           fill="var(--cockpit-text-primary)" fontSize="18" fontWeight="700"
-          fontFamily="'Orbitron', var(--font-display), sans-serif" letterSpacing="1">
+          fontFamily="var(--font-mono)" letterSpacing="1">
           {total}
         </text>
         <text x={CX} y={CY + 12} textAnchor="middle"
@@ -501,7 +500,10 @@ function FeedItem({ record, idx }: { record: any; idx: number }) {
   return (
     <div
       className={`cockpit-feed-item${expanded ? ' cockpit-feed-item--expanded' : ''}`}
-      style={{ animationDelay: `${idx * 0.04}s` }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded) } }}
       onClick={() => setExpanded(!expanded)}
     >
       <div className="cockpit-feed-item__timeline">
@@ -760,10 +762,6 @@ export default function CockpitPage() {
 
   return (
     <div className="cockpit-root">
-      {/* ═══ 背景层 ═══ */}
-      <div className="cockpit-bg-grid" />
-      <div className="cockpit-ambient cockpit-ambient--top" />
-      <div className="cockpit-ambient cockpit-ambient--bottom" />
 
       {/* ═══ 顶部状态栏 ═══ */}
       <div className="cockpit-topbar">

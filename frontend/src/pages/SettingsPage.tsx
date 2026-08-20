@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Input, Button, Typography, message, Tag, Alert, Radio, Tooltip, Skeleton } from 'antd'
 import {
   SaveOutlined, SyncOutlined, ClockCircleOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, ApiOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, ApiOutlined, EditOutlined,
   KeyOutlined, StarFilled, ScheduleOutlined, MessageOutlined,
 } from '@ant-design/icons'
 import { scheduleAPI, settingsAPI, feishuAPI } from '../services/api'
@@ -108,15 +108,9 @@ function ProviderCard({
       borderRadius: 16,
       border: active ? `2px solid ${provider.color}` : '1px solid var(--border)',
       overflow: 'hidden',
-      transition: 'all 0.2s ease',
+      transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
       position: 'relative',
     }}>
-      {/* Left accent bar */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-        background: `linear-gradient(180deg, ${provider.color}, ${provider.color}88)`,
-        borderRadius: '4px 0 0 4px',
-      }} />
 
       {/* Header */}
       <div style={{
@@ -503,11 +497,11 @@ export default function SettingsPage() {
     <div>
       <div style={{ marginBottom: 28 }}>
         <h1 className="page-title animate-fade-in-up">系统设置</h1>
-        <div className="page-subtitle animate-fade-in-up" style={{ animationDelay: '0.05s' }}>SETTINGS · AI 模型与调度配置</div>
+        <div className="page-subtitle">SETTINGS · AI 模型与调度配置</div>
       </div>
 
       {/* Active provider selector */}
-      <div className="animate-fade-in-up" style={{ marginBottom: 24, animationDelay: '0.1s' }}>
+      <div style={{ marginBottom: 24, }}>
         <div style={{
           background: 'var(--surface-0, #fff)',
           borderRadius: 16,
@@ -515,11 +509,6 @@ export default function SettingsPage() {
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
-            borderRadius: '4px 0 0 4px',
-          }} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '18px 22px 14px 22px',
@@ -568,7 +557,7 @@ export default function SettingsPage() {
 
       {/* AI Provider config cards */}
       {aiProviders.map((p, i) => (
-        <div key={p.key} className={`animate-fade-in-up delay-${i + 1}`} style={{ marginBottom: 16 }}>
+        <div key={p.key} style={{ marginBottom: 16 }}>
           <ProviderCard
             provider={p}
             state={providerStates[p.key]}
@@ -582,7 +571,7 @@ export default function SettingsPage() {
 
       {/* Service Provider cards (Firecrawl etc.) — API key only, no model/active */}
       {serviceProviders.map((p, i) => (
-        <div key={p.key} className={`animate-fade-in-up delay-${i + 1}`} style={{ marginBottom: 16 }}>
+        <div key={p.key} style={{ marginBottom: 16 }}>
           <ProviderCard
             provider={p}
             state={providerStates[p.key]}
@@ -597,7 +586,7 @@ export default function SettingsPage() {
       ))}
 
       {/* AI 分析提示词 */}
-      <div className="animate-fade-in-up" style={{ marginBottom: 16, animationDelay: '0.25s' }}>
+      <div style={{ marginBottom: 16, }}>
         <div style={{
           background: 'var(--surface-0, #fff)',
           borderRadius: 16,
@@ -605,11 +594,6 @@ export default function SettingsPage() {
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
-            borderRadius: '4px 0 0 4px',
-          }} />
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '18px 22px 14px 22px',
@@ -622,7 +606,7 @@ export default function SettingsPage() {
                 background: 'rgba(15,118,110,0.08)',
                 border: '1px solid rgba(15,118,110,0.15)',
               }}>
-                <span style={{ fontSize: 13 }}>📝</span>
+                <EditOutlined style={{ fontSize: 13, color: 'var(--accent)' }} />
                 <Text style={{ color: '#0f766e', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)' }}>
                   AI 分析提示词
                 </Text>
@@ -722,7 +706,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Feishu push */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+      <div>
         <div style={{
           background: 'var(--surface-0, #fff)',
           borderRadius: 16,
@@ -730,11 +714,6 @@ export default function SettingsPage() {
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #3370ff, #3370ff88)',
-            borderRadius: '4px 0 0 4px',
-          }} />
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '18px 22px 14px 22px',
@@ -840,7 +819,7 @@ export default function SettingsPage() {
 
 
       {/* Scheduler */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
+      <div>
         <div style={{
           background: 'var(--surface-0, #fff)',
           borderRadius: 16,
@@ -848,11 +827,6 @@ export default function SettingsPage() {
           overflow: 'hidden',
           position: 'relative',
         }}>
-          <div style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-            background: 'linear-gradient(180deg, #0f766e, #0f766e88)',
-            borderRadius: '4px 0 0 4px',
-          }} />
 
           {/* Scheduler header */}
           <div style={{

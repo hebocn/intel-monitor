@@ -117,20 +117,6 @@ export default function LoginPage({ onLogin }: Props) {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Ambient warm gradients */}
-      <div style={{
-        position: 'absolute', top: '15%', left: '45%',
-        width: 700, height: 700,
-        transform: 'translate(-50%, -50%)',
-        background: 'radial-gradient(circle, rgba(15,118,110,0.06) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '5%', right: '15%',
-        width: 500, height: 500,
-        background: 'radial-gradient(circle, rgba(15,118,110,0.04) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
 
       {/* Corner lines */}
       <div style={{ position: 'absolute', top: 48, left: 48, width: 60, height: 60, borderTop: '1px solid rgba(15,118,110,0.12)', borderLeft: '1px solid rgba(15,118,110,0.12)' }} />
@@ -150,20 +136,20 @@ export default function LoginPage({ onLogin }: Props) {
         {/* Top accent */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-          background: 'linear-gradient(90deg, transparent 10%, #0f766e, transparent 90%)',
-          opacity: 0.6,
+          background: 'var(--accent-strong)',
+          opacity: 0.8,
         }} />
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             width: 76, height: 76, borderRadius: 18,
-            background: 'linear-gradient(135deg, rgba(15,118,110,0.12), rgba(15,118,110,0.04))',
-            border: '1px solid rgba(15,118,110,0.15)',
+            background: 'var(--accent-light)',
+            border: '1px solid var(--accent-light)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: 20,
           }}>
-            <RadarChartOutlined style={{ fontSize: 34, color: '#0f766e' }} />
+            <RadarChartOutlined style={{ fontSize: 34, color: 'var(--accent)' }} />
           </div>
           <div style={{
             color: 'var(--text-primary)', fontWeight: 700,
